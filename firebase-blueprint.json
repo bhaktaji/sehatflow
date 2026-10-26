@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User account profile storing role, contact information, and clinic association.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "description": "User email address" },
+        "displayName": { "type": "string", "description": "Full name of the user" },
+        "role": { "type": "string", "enum": ["CLINIC_ADMIN", "DOCTOR", "RECEPTIONIST", "PATIENT"], "description": "Primary user role" },
+        "clinicId": { "type": "string", "description": "Associated clinic ID" },
+        "phone": { "type": "string", "description": "Contact phone number" },
+        "specialization": { "type": "string", "description": "Doctor medical specialty" },
+        "roomNumber": { "type": "string", "description": "Doctor room or cabin number" },
+        "deskName": { "type": "string", "description": "Receptionist desk identifier" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp via FieldValue.serverTimestamp()" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp via FieldValue.serverTimestamp()" }
+      },
+      "required": ["userId", "email", "displayName", "role"]
+    },
+    "Clinic": {
+      "title": "Clinic",
+      "description": "Registered clinic details, admin ownership, staff invite codes, and subscription status.",
+      "type": "object",
+      "properties": {
+        "clinicId": { "type": "string", "description": "Unique clinic identifier" },
+        "name": { "type": "string", "description": "Official clinic name" },
+        "address": { "type": "string", "description": "Physical address" },
+        "phone": { "type": "string", "description": "Clinic reception phone" },
+        "adminUid": { "type": "string", "description": "Owner / Administrator Firebase Auth UID" },
+        "inviteCodeDoctor": { "type": "string", "description": "Doctor staff onboarding invite code" },
+        "inviteCodeReceptionist": { "type": "string", "description": "Receptionist onboarding invite code" },
+        "subscriptionStatus": { "type": "string", "enum": ["TRIAL", "ACTIVE", "EXPIRED"], "description": "Subscription tier status" },
+        "monthlyFee": { "type": "number", "description": "Monthly fee in INR (499)" },
+        "trialEndsAt": { "type": "string", "format": "date-time", "description": "Trial expiry timestamp" },
+        "subscribedUntil": { "type": "string", "format": "date-time", "description": "Active subscription valid-until timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Creation timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last update timestamp" }
+      },
+      "required": ["clinicId", "name", "adminUid", "subscriptionStatus"]
+    },
+    "TokenItem": {
+      "title": "TokenItem",
+      "description": "Live queue token assigned to a patient for clinic consultation.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Document token ID" },
+        "clinicId": { "type": "string", "description": "Associated clinic ID" },
+        "tokenNumber": { "type": "number", "description": "Sequential numerical token" },
+        "tokenCode": { "type": "string", "description": "Display code e.g. SF-101" },
+        "patientName": { "type": "string", "description": "Patient full name" },
+        "patientPhone": { "type": "string", "description": "Patient phone or WhatsApp" },
+        "patientUid": { "type": "string", "description": "Patient Auth UID if signed in" },
+        "doctorId": { "type": "string", "description": "Assigned doctor ID" },
+        "doctorName": { "type": "string", "description": "Assigned doctor name" },
+        "status": { "type": "string", "enum": ["WAITING", "CALLED", "IN_CONSULTATION", "COMPLETED", "SKIPPED", "NO_SHOW", "CANCELLED"], "description": "Queue status" },
+        "isPriority": { "type": "boolean", "description": "Emergency or priority flag" },
+        "notes": { "type": "string", "description": "Reception or triage notes" },
+        "estimatedWaitMinutes": { "type": "number", "description": "Estimated remaining wait time" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Issue timestamp" },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Last status update timestamp" }
+      },
+      "required": ["clinicId", "tokenNumber", "tokenCode", "patientName", "status"]
+    },
+    "SubscriptionRecord": {
+      "title": "SubscriptionRecord",
+      "description": "Billing record and invoice for the ₹499/month SehatFlow Pro clinic subscription.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Subscription invoice ID" },
+        "clinicId": { "type": "string", "description": "Associated clinic ID" },
+        "adminUid": { "type": "string", "description": "Administrator Auth UID" },
+        "planName": { "type": "string", "description": "Subscription tier name" },
+        "amount": { "type": "number", "description": "Amount paid in INR" },
+        "currency": { "type": "string", "description": "Currency code" },
+        "status": { "type": "string", "enum": ["ACTIVE", "EXPIRED", "PENDING"], "description": "Payment status" },
+        "paymentMethod": { "type": "string", "description": "Payment method used" },
+        "transactionId": { "type": "string", "description": "Unique transaction or UPI reference" },
+        "paidAt": { "type": "string", "format": "date-time", "description": "Payment timestamp" },
+        "expiresAt": { "type": "string", "format": "date-time", "description": "Subscription coverage end timestamp" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Record creation timestamp" }
+      },
+      "required": ["clinicId", "adminUid", "planName", "amount", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User account profiles and roles"
+    },
+    "/clinics/{clinicId}": {
+      "schema": { "$ref": "#/entities/Clinic" },
+      "description": "Clinic entities with subscription status and invite codes"
+    },
+    "/clinics/{clinicId}/tokens/{tokenId}": {
+      "schema": { "$ref": "#/entities/TokenItem" },
+      "description": "Live clinic queue tokens"
+    },
+    "/subscriptions/{subscriptionId}": {
+      "schema": { "$ref": "#/entities/SubscriptionRecord" },
+      "description": "Clinic monthly subscription payment records"
+    }
+  }
+}

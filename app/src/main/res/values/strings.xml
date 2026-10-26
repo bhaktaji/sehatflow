@@ -1,0 +1,121 @@
+<resources>
+    <string name="app_name">SehatFlow</string>
+
+    <!-- Auth & Roles -->
+    <string name="tab_patient">Patient</string>
+    <string name="tab_staff">Staff</string>
+    <string name="login_title">SehatFlow</string>
+    <string name="login_subtitle">Less Waiting. Smarter Care.</string>
+    <string name="login_supporting_text">Track your clinic token, know your estimated waiting time, and plan your visit.</string>
+    <string name="for_patients_header">For Patients</string>
+    <string name="continue_with_google_btn">Continue with Google</string>
+    <string name="or_divider">OR</string>
+    <string name="for_clinic_staff_header">For Clinic Staff</string>
+    <string name="staff_prompt_label">Are you a doctor or clinic staff member?</string>
+    <string name="staff_sign_in_btn">Staff Sign In</string>
+    <string name="staff_sign_in_cta">Clinic Staff? Staff Sign In</string>
+    <string name="health_profile_title">Complete Your Health Profile (Optional)</string>
+    <string name="health_profile_subtitle">Help your doctor prepare for your visit. You can skip this now and update it anytime.</string>
+    <string name="health_profile_skip_btn">Skip for now</string>
+    <string name="health_profile_save_btn">Save Health Profile</string>
+    <string name="health_profile_unverified_badge">Reported by patient • Not clinically verified</string>
+    <string name="settings_title">Settings &amp; Preferences</string>
+    <string name="settings_appearance_title">Appearance</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="theme_system">System Default</string>
+    <string name="phone_label">Mobile Phone Number</string>
+    <string name="phone_hint">e.g. 9876543210</string>
+    <string name="name_label">Your Full Name</string>
+    <string name="name_hint">e.g. John Doe</string>
+    <string name="send_otp_btn">Send OTP Code</string>
+    <string name="otp_label">6-Digit Verification Code</string>
+    <string name="otp_hint">123456</string>
+    <string name="verify_btn">Verify &amp; Continue</string>
+    <string name="username_label">Staff Username</string>
+    <string name="username_hint">doctor / reception / owner</string>
+    <string name="password_label">Password</string>
+    <string name="login_btn">Sign In as Staff</string>
+    <string name="logout_btn">Sign Out</string>
+
+    <!-- General Navigation & States -->
+    <string name="offline_banner_text">You are currently offline. Showing cached queue state.</string>
+    <string name="loading_text">Loading…</string>
+    <string name="retry_btn">Retry</string>
+    <string name="confirm_btn">Confirm</string>
+    <string name="cancel_btn">Cancel</string>
+    <string name="close_btn">Close</string>
+    <string name="back_btn">Back</string>
+    <string name="refresh_btn">Refresh</string>
+    <string name="reason_required_hint">Enter reason (mandatory for audit log)</string>
+
+    <!-- Patient Flow -->
+    <string name="select_clinic_title">Select Clinic &amp; Doctor</string>
+    <string name="upload_prescription_title">Upload Prescription</string>
+    <string name="prescription_guidelines">Upload a clear photo or document of your doctor prescription (JPEG, PNG or PDF, max 5 MB). The reception team verifies your prescription before issuing an official queue token.</string>
+    <string name="camera_option">Take Photo with Camera</string>
+    <string name="gallery_option">Choose from Gallery / Files</string>
+    <string name="consent_title">Data Privacy &amp; Health Consent</string>
+    <string name="consent_body">Pursuant to the Digital Personal Data Protection (DPDP) Act 2023, your uploaded prescription and medical records are stored securely, accessed only by verified clinic personnel for queue triage, and are automatically purged at session completion. By proceeding, you consent to digital processing.</string>
+    <string name="consent_checkbox">I consent to the collection and verification of my prescription.</string>
+    <string name="submit_rx_btn">Submit &amp; Request Token</string>
+    <string name="rx_uploaded_success">Prescription uploaded. Awaiting receptionist verification.</string>
+
+    <!-- Live Queue & Status -->
+    <string name="your_token">YOUR TOKEN</string>
+    <string name="now_serving">Now Serving</string>
+    <string name="estimated_wait">Estimated Wait</string>
+    <string name="people_ahead">People Ahead</string>
+    <string name="last_updated">Last updated: %1$s</string>
+    <string name="status_pending">Pending Verification</string>
+    <string name="status_rejected">Prescription Rejected</string>
+    <string name="status_waiting">Waiting in Queue</string>
+    <string name="status_called">Token Called</string>
+    <string name="status_in_consultation">In Consultation</string>
+    <string name="status_completed">Completed</string>
+    <string name="status_skipped">Skipped</string>
+    <string name="status_no_show">No Show</string>
+    <string name="status_cancelled">Cancelled</string>
+    <string name="you_are_next">You are next! Please head to the clinic room.</string>
+    <string name="approx_minutes">%1$d mins</string>
+    <string name="cancel_token_btn">Cancel My Token</string>
+    <string name="visit_history_btn">Past Visits</string>
+
+    <!-- Receptionist Flow -->
+    <string name="reception_dashboard_title">Receptionist Queue</string>
+    <string name="tab_live_queue">Live Queue</string>
+    <string name="tab_pending_rx">Pending Rx (%1$d)</string>
+    <string name="walk_in_btn">+ Walk-in Patient</string>
+    <string name="review_rx_btn">Review Prescription</string>
+    <string name="approve_rx_btn">Approve &amp; Assign Token</string>
+    <string name="reject_rx_btn">Reject Prescription</string>
+    <string name="reorder_btn">Reorder Position</string>
+    <string name="emergency_priority_btn">Emergency / Priority</string>
+    <string name="mark_no_show_btn">Mark No-Show</string>
+
+    <!-- Doctor Flow -->
+    <string name="doctor_dashboard_title">Doctor Consultation</string>
+    <string name="call_next_btn">Call Next Patient</string>
+    <string name="start_consultation_btn">Start Consultation</string>
+    <string name="complete_consultation_btn">Complete</string>
+    <string name="skip_btn">Skip</string>
+    <string name="pause_break_btn">Take Break / Pause</string>
+    <string name="resume_btn">Resume Consultations</string>
+    <string name="view_verified_rx_btn">View Verified Rx</string>
+    <string name="patients_seen_today">Patients Seen: %1$d</string>
+    <string name="avg_consult_time">Avg Duration: %1$.1f min</string>
+
+    <!-- Server Configuration & Demo Mode -->
+    <string name="server_settings_title">Backend Server Settings</string>
+    <string name="server_url_label">API Base URL</string>
+    <string name="server_url_hint">http://10.0.2.2:8090/api/v1/</string>
+    <string name="save_settings_btn">Save &amp; Apply</string>
+    <string name="demo_mode_title">Instant Demo Mode</string>
+    <string name="demo_mode_desc">Preview all Patient, Doctor, and Receptionist flows offline with zero setup.</string>
+    <string name="demo_doctor_btn">Doctor Demo</string>
+    <string name="demo_reception_btn">Reception Demo</string>
+    <string name="demo_patient_btn">Patient Demo</string>
+    <string name="switch_to_demo_btn">Switch to Instant Demo Mode</string>
+    <string name="configure_server_btn">Configure Server IP</string>
+    <string name="connection_error_msg">Cannot reach %1$s. Ensure Spring Boot is running, set custom host IP, or switch to Instant Demo Mode.</string>
+</resources>

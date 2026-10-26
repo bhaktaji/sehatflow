@@ -1,0 +1,6 @@
+{
+  "name": "SehatFlow",
+  "description": "Smart clinic queue and token management with smooth onboarding, live tracking, and digital consultation workflows.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

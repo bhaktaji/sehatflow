@@ -1,0 +1,844 @@
+# SehatFlow — Complete Product Enhancement and Implementation Specification
+
+## 1. Project Overview
+
+You are working on SehatFlow, a clinic queue management and patient experience application designed to reduce unnecessary waiting times for patients and overcrowding at clinics.
+
+The application's core capabilities include:
+- Real-time patient token and queue status.
+- Estimated waiting times.
+- Appointment and clinic visit management, where supported.
+- Patient medical profiles and medical records.
+- Clinic staff workflows for managing queues and patient interactions.
+- Role-based access for patients, doctors, receptionists, and other authorized users.
+
+The product has two distinct user groups:
+
+**Primary users: Patients**
+Patients use SehatFlow to track their tokens, understand estimated waiting times, manage their profiles, and access authorized medical information.
+
+**Secondary users: Clinic staff**
+Doctors and receptionists use SehatFlow to manage clinic operations, patient queues, and medical records according to their assigned permissions.
+
+The application must prioritize the patient experience while keeping staff access clearly visible and functional.
+
+### Primary tagline
+
+**Less Waiting. Smarter Care.**
+
+### Overall objective
+
+Improve the existing application's branding, welcome page, authentication experience, patient onboarding, privacy controls, and Settings section.
+
+Implement these improvements directly in the existing codebase while preserving its architecture, existing features, authentication mechanisms, data integrity, and security controls.
+
+Do not stop after producing a plan or mockup. Inspect the existing implementation, make the changes, and test them.
+
+---
+
+# 2. Mandatory Initial Repository Inspection
+
+Before modifying any code, inspect the existing application.
+
+Identify:
+
+1. Frontend framework and application entry points.
+2. Backend framework, APIs, and database architecture.
+3. Existing welcome page and authentication components.
+4. Google OAuth/OIDC integration, if already implemented.
+5. Existing patient and staff registration workflows.
+6. Current user model, role model, and account-linking rules.
+7. Staff invitation-code validation and clinic association logic.
+8. Existing patient medical-profile and medical-record structures.
+9. Current role-based access-control implementation.
+10. Existing Settings page and theme-management capabilities.
+11. Current persistence mechanisms for user preferences.
+12. Existing privacy notices, consent handling, audit logs, and account-management features.
+13. Existing tests, linting commands, type checks, and build commands.
+
+Determine which features already exist and reuse them wherever possible.
+
+Do not create duplicate authentication systems, profile models, settings systems, or API endpoints unnecessarily.
+
+Do not assume that a feature is missing merely because it is not visible on the welcome page.
+
+If the existing implementation differs from the requirements below, preserve working functionality and make the smallest safe changes needed to satisfy the requirements.
+
+---
+
+# 3. Welcome Page Branding
+
+## 3.1 Application Name
+
+Replace the existing application name:
+
+"Clinic Queue System"
+
+with:
+
+**SehatFlow**
+
+Update the branding wherever it appears within the welcome page and related authentication entry points.
+
+Inspect for other outdated references that would make the experience inconsistent.
+
+Do not perform a destructive, application-wide search-and-replace that changes unrelated business logic, database identifiers, package names, or internal technical identifiers.
+
+## 3.2 Tagline
+
+Replace:
+
+"Real-time walk-in & token management"
+
+with:
+
+**"Less Waiting. Smarter Care."**
+
+This tagline must be displayed exactly as written.
+
+## 3.3 Remove Production Auth Tag
+
+Remove the "Production Auth" badge or tag from the welcome page.
+
+Ensure that removing the badge does not disable, bypass, or otherwise alter the actual authentication configuration.
+
+## 3.4 Welcome Page Design
+
+Create a modern, professional healthcare technology experience.
+
+Requirements:
+- Clear visual hierarchy.
+- Prominent SehatFlow branding.
+- The tagline displayed beneath or near the application name.
+- Concise patient-focused supporting text.
+- Patient sign-in as the primary action.
+- A clearly visible staff sign-in entry point.
+- Consistent typography, spacing, and colors.
+- Responsive layouts for mobile, tablet, and desktop.
+- Accessible controls and appropriate text contrast.
+- Consistency with the application's existing design system.
+
+Avoid excessive text, unnecessary decorative elements, and redundant explanations of cloud synchronization or identity infrastructure.
+
+The welcome page should communicate the benefit of the application rather than exposing implementation details.
+
+---
+
+# 4. Patient-First Welcome Page and Authentication Layout
+
+Patient sign-in must be the most prominent authentication action.
+
+Staff sign-in must be secondary but clearly visible and easy to find.
+
+Do not hide staff sign-in in a footer, obscure menu, or settings screen.
+
+## 4.1 Recommended Layout
+
+Display the welcome page in the following hierarchy:
+
+**SehatFlow**
+
+*Less Waiting. Smarter Care.*
+
+"Track your clinic token, know your estimated waiting time, and plan your visit."
+
+### Primary Section: For Patients
+
+Provide a clearly labeled patient authentication section.
+
+Suggested button:
+
+**Continue with Google**
+
+This must be the most prominent authentication action on the page.
+
+### Secondary Section: For Clinic Staff
+
+Display a separate, clearly visible entry point.
+
+Suggested text:
+
+"Are you a doctor or clinic staff member?"
+
+Button:
+
+**Staff Sign In**
+
+The staff action should open the dedicated staff authentication flow.
+
+On mobile, these sections may be stacked vertically. On desktop, they may be arranged side by side if doing so improves clarity.
+
+## 4.2 Authentication Section Cleanup
+
+Remove the existing standalone informational section that promotes or explains:
+- Cloud sync.
+- Identity.
+- Redundant authentication infrastructure details.
+
+Consolidate the relevant sign-in controls into the authentication area.
+
+If the existing design includes multiple sign-in methods, inspect their purpose before changing them.
+
+Use an "OR" separator only when there are two or more meaningful authentication options within the same flow.
+
+Do not display a decorative "OR" divider if there is only one authentication option.
+
+If Google sign-in is the only supported option for patients, display the Google button without an unnecessary divider.
+
+If another supported sign-in method must remain available, display the alternatives clearly and use an "OR" separator between them.
+
+Do not silently remove an existing authentication method without verifying its dependencies and purpose.
+
+---
+
+# 5. Authentication Architecture: Shared Provider, Separate User Journeys
+
+Google sign-in may be used by both patients and staff, provided the existing authentication architecture supports it.
+
+However, authentication and application authorization are separate concerns.
+
+Successful Google authentication establishes an identity. It does not automatically establish:
+- Patient registration status.
+- A completed medical profile.
+- Clinic membership.
+- Doctor or receptionist privileges.
+- Administrative permissions.
+
+Use the existing authentication provider, session management, and token-validation mechanisms wherever possible.
+
+## 5.1 Google Authentication Requirements
+
+When a user chooses Google sign-in:
+
+- Request only the identity scopes necessary for the application.
+- Obtain the user's name and email from the verified identity information returned by the provider, subject to the configured scopes and available claims.
+- Do not automatically collect medical information.
+- Do not request access to unrelated Google resources such as Drive, contacts, or calendar.
+- Handle authentication failures, cancellations, and expired sessions gracefully.
+- Preserve secure session management and logout behavior.
+- Avoid creating duplicate accounts for returning users.
+
+Do not assume that the user's email address alone is sufficient for every application workflow.
+
+If the application requires a verified mobile number, implement the appropriate verification flow and explain why the number is needed.
+
+## 5.2 Patient and Staff Account Separation
+
+Patients and staff may share an authentication provider, but their onboarding and authorization processes must remain distinct.
+
+Use stable identity-provider identifiers and the application's existing account-linking rules to identify returning users.
+
+Do not:
+- Automatically merge patient and staff accounts solely because they share an email address.
+- Grant staff permissions because a user chooses "Staff Sign In."
+- Grant doctor or receptionist privileges merely because Google authentication succeeds.
+- Allow frontend requests to determine privileged roles without backend verification.
+
+If one person legitimately has multiple authorized roles, support role selection only after verifying those roles on the backend.
+
+---
+
+# 6. Patient Google Sign-In and Onboarding Flow
+
+The patient journey is the primary product experience and must be optimized for simplicity.
+
+## 6.1 Step One: Patient Authentication
+
+When a patient selects "Continue with Google":
+
+1. Authenticate using the existing Google OAuth/OIDC configuration.
+2. Retrieve the necessary verified identity claims.
+3. Collect only the basic identity information required for account creation and authentication.
+4. Check whether a corresponding SehatFlow patient account already exists.
+5. Route the user according to their registration and onboarding status.
+
+The Google sign-in process must not automatically request or collect medical information.
+
+## 6.2 Step Two: Determine Account Status
+
+Support the following scenarios:
+
+1. New patient with no existing SehatFlow account.
+2. Existing patient with a completed profile.
+3. Existing patient with an incomplete profile.
+4. Returning patient who has already provided optional medical information.
+5. Patient who previously skipped optional profile fields.
+6. Patient who has updated their consent preferences.
+7. Existing patient who needs to update information or complete a required verification step.
+
+Returning users must not be forced through registration again unnecessarily.
+
+Do not create duplicate patient records when the same verified identity signs in repeatedly.
+
+## 6.3 Step Three: Collect Essential Information
+
+After authentication, collect only the additional information required for the applicable product functionality.
+
+The user's name and email should normally be populated from the verified Google identity when available.
+
+Other information, such as a mobile number, may be requested when required for a clearly explained purpose, such as appointment coordination or a supported clinic workflow.
+
+Clearly distinguish required fields from optional fields.
+
+Do not require a patient to complete an extensive medical profile merely to use basic queue-tracking functionality.
+
+## 6.4 Step Four: Offer an Optional Medical Profile
+
+After the essential onboarding steps, provide a separate section titled:
+
+**Complete Your Health Profile**
+
+Supporting text:
+
+"Add health information to help you maintain your profile and provide relevant information when needed. You can skip this step and complete it later."
+
+Potential fields include:
+
+| Field | Collection requirement |
+|---|---|
+| Date of birth or age | Optional unless a specific, justified requirement applies |
+| Blood group | Optional |
+| Height | Optional |
+| Weight | Optional |
+| Known allergies | Optional |
+| Existing medical conditions | Optional |
+| Current medications | Optional |
+| Relevant medical history | Optional |
+| Emergency contact | Optional unless a specific requirement applies |
+| Other relevant health information | Optional and purpose-specific |
+
+Do not collect every field merely because it is listed here.
+
+Inspect the existing data model and collect only information justified by the application's requirements.
+
+Where a field is not necessary for the patient's intended functionality, allow the patient to omit it.
+
+## 6.5 Step Five: Skip Optional Fields
+
+Provide a clear action:
+
+**Skip for now**
+
+Requirements:
+- Optional medical information must not be required by frontend or backend validation.
+- Skipping optional fields must not block access to basic queue-tracking functionality.
+- Skipped fields must remain unprovided rather than receiving fabricated defaults.
+- A missing value must not be interpreted as a confirmed medical fact.
+- Patients must be able to complete or update their profile later.
+- The application must distinguish patient-reported information from information recorded or verified by a clinician.
+
+Do not repeatedly prompt patients in a way that pressures them to disclose optional medical information.
+
+## 6.6 Step Six: Patient Dashboard
+
+After the required onboarding steps, route the patient to the existing patient-facing dashboard.
+
+Prioritize:
+- Active token and queue position, when available.
+- Estimated waiting time, when available.
+- Upcoming appointments, when supported.
+- Relevant patient profile information.
+- Authorized medical-record access, where implemented.
+
+Do not display fabricated queue positions, estimated waiting times, appointments, or medical information when the backend does not have the required data.
+
+---
+
+# 7. Medical Records and Clinical Data Integrity
+
+Patient profile information and clinician-authored medical records must remain distinct.
+
+## 7.1 Patient-Provided Information
+
+Examples include:
+- Patient-reported blood group.
+- Patient-reported height and weight.
+- Patient-reported allergies.
+- Patient-reported medical conditions.
+- Patient-reported medications.
+
+Represent these fields as patient-provided information.
+
+Where relevant, display an appropriate indicator such as "Reported by patient" or "Not clinically verified."
+
+Do not automatically present self-reported information as clinically verified.
+
+## 7.2 Clinician-Authored Medical Records
+
+When a doctor creates a prescription, consultation note, diagnosis, or other clinical record:
+
+- Associate the record with the correct patient.
+- Record its author and relevant consultation context.
+- Preserve the application's existing clinical-record structure.
+- Enforce authorization on the backend.
+- Maintain appropriate audit trails.
+- Prevent unauthorized modification or deletion.
+- Do not allow patient profile updates to overwrite clinician-authored records.
+
+## 7.3 Role-Based Medical-Record Access
+
+Preserve the intended separation between patient-facing and staff-facing functionality.
+
+- Patients may access their own authorized records through supported workflows.
+- Doctors may access records permitted by their role, clinic association, and applicable authorization rules.
+- Receptionists should not have access to medical-record contents unless a specific, authorized workflow requires it.
+- Unauthorized users must not gain access by changing patient identifiers in API requests.
+
+Do not implement access restrictions solely by hiding frontend components.
+
+---
+
+# 8. Staff Google Sign-In and Invitation-Based Onboarding
+
+Staff members must use a dedicated authentication and onboarding flow.
+
+Preserve the existing staff registration process, required fields, invitation validation, clinic association, and role-assignment logic.
+
+## 8.1 Staff Sign-In Entry Point
+
+The welcome page must include a visible action:
+
+**Clinic Staff? Staff Sign In**
+
+This action opens the dedicated staff authentication page.
+
+Google sign-in may be offered there if supported by the existing authentication provider.
+
+Preserve other existing staff authentication methods if they remain required by the application.
+
+## 8.2 Staff Authentication Flow
+
+### Step One: Authenticate
+
+Authenticate the staff member through the configured provider.
+
+Collect the minimum identity information necessary to identify the account.
+
+### Step Two: Check Staff Account Status
+
+After authentication, determine whether the user is:
+
+1. An existing authorized staff member.
+2. A new staff member who needs an invitation code.
+3. A staff member with incomplete onboarding.
+4. A user with an invalid invitation.
+5. A user with an expired invitation.
+6. A user attempting to reuse a single-use invitation.
+7. An authenticated user without staff authorization.
+
+### Step Three: Validate Invitation Code
+
+For new staff members, request an invitation code when required by the existing workflow.
+
+Validate the code on the backend.
+
+Check:
+- Validity.
+- Expiration.
+- Intended clinic.
+- Permitted use.
+- Whether it has already been used.
+- Whether the associated staff role is permitted.
+
+Apply suitable rate limiting and abuse protection.
+
+Do not rely on frontend validation alone.
+
+Do not reveal sensitive clinic or invitation information before successful validation.
+
+### Step Four: Complete Existing Staff Onboarding
+
+After invitation validation, continue the existing staff information-collection workflow.
+
+Preserve existing requirements for:
+- Staff details.
+- Clinic association.
+- Role assignment.
+- Approval, verification, or activation where applicable.
+
+Do not replace staff onboarding with the patient medical-profile form.
+
+### Step Five: Authorize Staff
+
+Grant only the permissions authorized by the backend.
+
+Examples:
+- Doctors can access permitted clinical workflows and medical records.
+- Receptionists can manage queues and access the patient information permitted to their role.
+- Administrative privileges require explicit authorization.
+
+Google sign-in alone must never grant privileged access.
+
+---
+
+# 9. DPDP Act, Privacy, and Data Minimization
+
+Design the application with India's Digital Personal Data Protection Act, 2023, and applicable rules and commencement notifications in mind.
+
+The implementation must support privacy by design, but the coding agent must not claim that UI changes alone establish legal compliance.
+
+## 9.1 Purpose Limitation and Data Minimization
+
+- Collect only personal data needed for defined purposes.
+- Do not collect medical information during Google authentication.
+- Keep optional health information separate from basic account identity information.
+- Do not require optional medical-profile completion to access unrelated functionality.
+- Do not collect unnecessary personal or medical information without a defined product requirement and appropriate legal basis.
+
+## 9.2 Privacy Notice and Consent
+
+Where consent is the applicable legal basis:
+
+- Present an understandable notice before collecting the relevant information.
+- Explain the categories of information collected.
+- Explain the purposes for which the information will be processed.
+- Explain relevant disclosures and data-sharing practices.
+- Provide applicable withdrawal mechanisms.
+- Record the relevant consent event and the version of the notice.
+- Make privacy information accessible from appropriate areas of the application.
+
+Avoid bundling optional medical-profile consent into generic authentication terms.
+
+Do not assume every processing activity must use consent as its legal basis. The applicable basis must be determined for each processing activity.
+
+## 9.3 Optional Health Fields
+
+For blood group, height, weight, allergies, medical conditions, medication history, and other optional health information:
+
+- Clearly identify optional fields.
+- Explain why the information may be useful.
+- Allow the user to omit fields.
+- Ensure backend validation respects their optional status.
+- Do not use fake defaults for missing information.
+- Avoid unnecessary collection or repeated prompts.
+
+## 9.4 Privacy and Data-Principal Rights
+
+Where applicable, provide accessible mechanisms for users to:
+- Review their profile information.
+- Correct inaccurate information.
+- Review relevant privacy notices.
+- Manage or withdraw consent where applicable.
+- Submit applicable data-rights requests.
+- Request account deletion or erasure, subject to applicable obligations.
+- Contact the relevant support or grievance mechanism.
+
+Do not promise deletion of information that must lawfully be retained under applicable obligations.
+
+## 9.5 Security Safeguards
+
+- Enforce server-side authorization.
+- Use encryption in transit and appropriate encryption at rest.
+- Restrict medical-data access according to assigned roles and authorized purposes.
+- Avoid logging medical-record contents, authentication tokens, and unnecessary personal information.
+- Maintain appropriate security logs and audit trails.
+- Validate authorization for every protected API request.
+- Protect invitation endpoints against brute-force attempts.
+- Preserve secure session management and logout behavior.
+- Avoid exposing personal or medical information in error messages.
+
+## 9.6 Legal Verification
+
+Before production deployment, verify the applicable statutory provisions, rules, commencement dates, notice requirements, consent requirements, children's-data requirements where relevant, retention obligations, and grievance procedures with qualified legal counsel.
+
+Do not invent legal requirements or describe the implementation as legally certified.
+
+---
+
+# 10. Application Settings Enhancement
+
+Expand the existing Settings page without duplicating the application's current settings infrastructure.
+
+First, inspect the existing Settings implementation and identify which preferences already exist.
+
+Reuse the current components, design tokens, state management, and persistence strategy.
+
+## 10.1 Appearance Settings
+
+Add a theme selector with three options:
+
+- Light.
+- Dark.
+- System Default.
+
+A toggle or segmented control may be used, provided all three options are available.
+
+### Required behavior
+
+- Theme changes apply immediately.
+- The selected theme persists across page reloads and application restarts.
+- System Default follows the operating-system theme when supported.
+- The selected theme is applied consistently across the application.
+- Shared components, dialogs, forms, cards, navigation, and settings remain readable in all themes.
+- Focus states and interactive elements remain accessible.
+- Avoid noticeable flashes of the wrong theme during initialization where feasible.
+- Do not introduce hardcoded colors that break dark mode.
+
+Use the appropriate persistence mechanism for the current platform.
+
+If both web and mobile interfaces exist, follow each platform's conventions while maintaining consistent behavior.
+
+## 10.2 Additional Settings
+
+Implement additional settings where the required infrastructure and product requirements exist.
+
+| Setting | Expected behavior | Priority |
+|---|---|---|
+| Theme | Light, Dark, System Default | P0 |
+| Language | Select a supported application language | P1 |
+| Notifications | Manage supported notification preferences | P1 |
+| Sound and vibration | Control queue-related alerts where supported | P2 |
+| Privacy | Display applicable privacy information and controls | P1 |
+| Account and profile | Access supported profile-management features | P1 |
+| About SehatFlow | Display application information and version | P1 |
+| Help and Support | Open a working support or contact option | P1 |
+| Terms and Privacy Policy | Open the applicable legal documents | P1 |
+
+These are candidate features, not permission to create nonfunctional controls.
+
+Do not:
+- Add a notification toggle without a corresponding notification mechanism.
+- Offer unsupported languages.
+- Add buttons that do nothing.
+- Expose unnecessary authentication or account-management controls.
+- Invent support contacts, legal documents, or application version details.
+
+Implement only the features supported by the existing application or those that can be completed as part of this task.
+
+## 10.3 Preference Persistence
+
+- Reuse the existing preference-persistence strategy.
+- Use local storage or the platform's equivalent for suitable UI preferences.
+- Store account-associated preferences with the account only when supported and appropriate.
+- Prevent preferences from leaking between users on a shared device.
+- Handle missing, invalid, or outdated preference values gracefully.
+
+---
+
+# 11. UI/UX and Accessibility Requirements
+
+Apply consistent design principles across the welcome page, authentication screens, onboarding forms, and Settings page.
+
+Requirements:
+- Modern, minimal healthcare-oriented design.
+- Patient-first visual hierarchy.
+- Clearly labeled patient and staff journeys.
+- Consistent typography and spacing.
+- Accessible keyboard navigation.
+- Readable text contrast in light and dark themes.
+- Appropriate focus, hover, active, disabled, loading, and error states.
+- Responsive mobile, tablet, and desktop layouts.
+- Clear validation messages.
+- Useful loading states during authentication and data retrieval.
+- No unnecessary animations.
+- No redundant authentication or infrastructure messaging.
+
+Reuse existing UI components wherever possible.
+
+Avoid unrelated redesigns unless shared components need modification for consistency.
+
+Do not introduce unnecessary dependencies or refactor unrelated business logic.
+
+---
+
+# 12. Implementation and Code Quality Requirements
+
+Implement the changes in the existing repository using the established framework and coding conventions.
+
+### General requirements
+
+1. Inspect before modifying.
+2. Reuse existing authentication and authorization infrastructure.
+3. Preserve the existing patient and staff data models wherever possible.
+4. Avoid duplicate APIs and settings systems.
+5. Make the smallest safe changes needed.
+6. Preserve existing functionality and backward compatibility.
+7. Avoid hardcoded credentials, secrets, and privileged role assignments.
+8. Keep authentication logic separate from presentation logic.
+9. Ensure that optional fields remain optional throughout the frontend, API, and database layers.
+10. Maintain existing error-handling and logging conventions.
+11. Document any required configuration or data migration.
+12. Do not weaken security to simplify onboarding.
+
+If a requirement cannot be implemented safely without additional information or infrastructure, document the dependency rather than inventing behavior.
+
+---
+
+# 13. Testing and Regression Requirements
+
+Run the existing automated checks that are available in the repository.
+
+## 13.1 Welcome Page Tests
+
+Verify:
+- The application name is SehatFlow.
+- The tagline reads "Less Waiting. Smarter Care."
+- The old tagline is removed.
+- The Production Auth badge is removed.
+- Patient sign-in is the primary action.
+- Staff sign-in remains clearly visible.
+- Responsive behavior works correctly.
+
+## 13.2 Patient Authentication Tests
+
+Test:
+- Successful Google authentication.
+- Failed authentication.
+- Cancelled authentication.
+- Returning patient sign-in.
+- New patient registration.
+- Duplicate-account prevention.
+- Correct routing based on onboarding status.
+
+## 13.3 Patient Onboarding Tests
+
+Verify:
+- Required fields are validated.
+- Optional medical fields can be skipped.
+- Skipped fields remain unprovided.
+- Optional fields are not mandatory in backend validation.
+- Patients can complete their profiles later.
+- Patient-reported information remains distinguishable from clinician-authored records.
+- Missing information is not displayed as a verified medical fact.
+
+## 13.4 Staff Authentication Tests
+
+Test:
+- Existing staff sign-in.
+- New staff onboarding.
+- Valid invitation codes.
+- Invalid invitation codes.
+- Expired invitations.
+- Reuse of single-use invitations.
+- Incomplete staff onboarding.
+- Users without staff authorization.
+- Correct clinic association.
+- Correct role assignment.
+- Unauthorized access attempts.
+
+Confirm that successful Google authentication does not automatically grant staff privileges.
+
+## 13.5 Privacy and Security Tests
+
+Verify:
+- Relevant privacy notices are presented at appropriate points.
+- Applicable consent records are created.
+- Optional medical fields do not trigger unnecessary validation failures.
+- Unauthorized users cannot access medical records.
+- Patients cannot retrieve another patient's records by changing identifiers.
+- Receptionists cannot access restricted clinical data.
+- Staff cannot access another clinic's data without authorization.
+- Invitation endpoints enforce appropriate protections.
+- Sensitive information is not exposed through logs or error responses.
+- Applicable account and data-rights workflows behave as designed.
+
+## 13.6 Settings Tests
+
+Verify:
+- Light mode works.
+- Dark mode works.
+- System Default behaves correctly.
+- Theme preferences persist.
+- Themes are consistent across the application.
+- Text contrast and accessibility are maintained.
+- Existing settings remain functional.
+- Every newly introduced setting performs its stated function.
+
+## 13.7 Regression and Build Checks
+
+Where available:
+- Run unit tests.
+- Run integration tests.
+- Run backend authorization tests.
+- Run linting.
+- Run type checks.
+- Run the production build.
+- Verify existing queue-management, appointment, and medical-record workflows.
+
+Fix regressions introduced by the implementation.
+
+Do not change unrelated business logic merely to make tests pass.
+
+If a check cannot be run because of missing dependencies, unavailable services, or environment restrictions, document the limitation rather than claiming success.
+
+---
+
+# 14. Definition of Done
+
+The implementation is complete when all applicable requirements below are satisfied.
+
+### Branding and Welcome Page
+- [ ] Application name updated to SehatFlow.
+- [ ] Tagline updated to "Less Waiting. Smarter Care."
+- [ ] Old welcome-page tagline removed.
+- [ ] Production Auth badge removed from the welcome page.
+- [ ] Authentication controls consolidated into a clean layout.
+- [ ] Patient sign-in is the primary action.
+- [ ] Staff sign-in is visible nearby but remains secondary.
+- [ ] Responsive behavior is verified.
+
+### Authentication and Onboarding
+- [ ] Google authentication works for supported user types.
+- [ ] Patient and staff onboarding remain separate.
+- [ ] Returning users are routed correctly.
+- [ ] Duplicate accounts are prevented according to the existing account-linking rules.
+- [ ] Google authentication collects only the necessary identity information.
+- [ ] Patient onboarding collects only the required additional information.
+- [ ] Optional medical-profile fields can be skipped.
+- [ ] Staff invitation validation remains secure.
+- [ ] Existing staff onboarding requirements are preserved.
+- [ ] Google authentication does not grant staff privileges automatically.
+- [ ] Backend authorization remains enforced.
+
+### Medical Records and Privacy
+- [ ] Patient-provided information is distinguished from clinician-authored records.
+- [ ] Medical records remain protected by appropriate role-based authorization.
+- [ ] Applicable privacy notices and consent mechanisms are implemented.
+- [ ] Relevant data-rights workflows are supported where required.
+- [ ] Medical data is not collected automatically through Google sign-in.
+- [ ] Sensitive information is protected from unauthorized access and unnecessary logging.
+
+### Settings
+- [ ] Light, Dark, and System Default themes are implemented.
+- [ ] Theme changes apply immediately.
+- [ ] Theme preferences persist correctly.
+- [ ] Additional settings are implemented only where functional.
+- [ ] Existing settings remain functional.
+
+### Quality Assurance
+- [ ] Relevant tests are executed.
+- [ ] Build and static checks are executed where available.
+- [ ] Regressions introduced by the changes are resolved.
+- [ ] Unresolved dependencies and limitations are documented.
+- [ ] No unrelated functionality is broken.
+
+---
+
+# 15. Final Handover Report
+
+After completing the implementation, provide a concise but informative report containing:
+
+1. **Repository findings:** Existing authentication, routing, settings, and onboarding mechanisms discovered.
+2. **Branding changes:** Files and components updated.
+3. **Authentication changes:** How patient and staff authentication work.
+4. **Patient onboarding:** Required fields, optional fields, and skip behavior.
+5. **Medical-record handling:** How patient-reported information is separated from clinician-authored records.
+6. **Privacy implementation:** Notices, consent mechanisms, data-rights workflows, and security measures implemented.
+7. **Staff onboarding:** Invitation validation, clinic association, and role assignment.
+8. **Settings changes:** Theme behavior and other functional settings added.
+9. **Testing results:** Commands executed and their actual outcomes.
+10. **Outstanding issues:** Configuration, infrastructure, migration, or legal-review requirements that remain.
+
+Clearly distinguish completed work from proposed work or unverified assumptions.
+
+Do not claim that a feature works unless it has been implemented and appropriately tested.
+
+Do not claim DPDP legal compliance solely because the UI and backend changes have been completed.
+
+## Final Instruction
+
+Implement the requested changes directly in the existing SehatFlow project.
+
+Prioritize a simple, patient-first experience, preserve the existing staff workflows, enforce authorization on the backend, and minimize unnecessary personal and medical-data collection.
+
+Make focused changes, test the affected functionality, and provide the final implementation report.

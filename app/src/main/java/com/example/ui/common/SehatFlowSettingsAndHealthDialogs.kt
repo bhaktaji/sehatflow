@@ -1,0 +1,660 @@
+package com.example.ui.common
+
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import com.example.R
+import com.example.core.datastore.AppThemeMode
+import com.example.domain.model.DpdpPrivacyRegistry
+import com.example.domain.model.PatientHealthProfile
+import com.example.domain.model.PatientHealthProfileRegistry
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SehatFlowSettingsDialog(
+    currentServerUrl: String,
+    isDemoMode: Boolean,
+    currentThemeMode: AppThemeMode,
+    isQueueSoundEnabled: Boolean,
+    currentPatientId: String? = null,
+    onSelectThemeMode: (AppThemeMode) -> Unit,
+    onToggleQueueSound: (Boolean) -> Unit,
+    onSaveServerConfig: (String, Boolean) -> Unit,
+    onOpenHealthProfile: (() -> Unit)? = null,
+    onDismiss: () -> Unit
+) {
+    var urlInput by remember(currentServerUrl) { mutableStateOf(currentServerUrl) }
+    var demoToggle by remember(isDemoMode) { mutableStateOf(isDemoMode) }
+    var selectedLanguage by remember { mutableStateOf("en") }
+    var dpdpStatusMessage by remember { mutableStateOf<String?>(null) }
+    val activePatientId = currentPatientId?.takeIf { it.isNotBlank() } ?: "pat_demo_patient"
+    var consentRecord by remember(activePatientId) {
+        mutableStateOf(DpdpPrivacyRegistry.getConsentRecord(activePatientId))
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Settings,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Text(
+                text = stringResource(R.string.settings_title),
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                // 1. APPEARANCE (THEME SELECTOR - P0)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_appearance_section")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Palette,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = stringResource(R.string.settings_appearance_title),
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "Choose how SehatFlow looks on your device. Changes apply immediately.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            AppThemeMode.entries.forEach { mode ->
+                                val selected = currentThemeMode == mode
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { onSelectThemeMode(mode) },
+                                    label = {
+                                        Text(
+                                            text = when (mode) {
+                                                AppThemeMode.LIGHT -> stringResource(R.string.theme_light)
+                                                AppThemeMode.DARK -> stringResource(R.string.theme_dark)
+                                                AppThemeMode.SYSTEM -> stringResource(R.string.theme_system)
+                                            },
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("theme_option_${mode.name}")
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 2. QUEUE NOTIFICATIONS & ALERTS (P1)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Queue Turn Sound & Vibration",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "Vibrate and chime when your token is called or next in line",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = isQueueSoundEnabled,
+                            onCheckedChange = onToggleQueueSound,
+                            modifier = Modifier.testTag("settings_queue_sound_toggle")
+                        )
+                    }
+                }
+
+                // 3. OPTIONAL HEALTH PROFILE & DPDP PRIVACY CONTROLS (P1)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_privacy_section")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.PrivacyTip,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "Health Profile & Privacy Rights (DPDP)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        if (onOpenHealthProfile != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    onDismiss()
+                                    onOpenHealthProfile()
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("open_health_profile_btn"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Icon(Icons.Default.FavoriteBorder, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Manage Optional Health Profile")
+                            }
+                        }
+
+                        Text(
+                            text = "Privacy Notice Language (Eighth Schedule):",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            listOf("en" to "English", "hi" to "हिन्दी", "bn" to "বাংলা").forEach { (code, label) ->
+                                FilterChip(
+                                    selected = selectedLanguage == code,
+                                    onClick = { selectedLanguage = code },
+                                    label = { Text(label, style = MaterialTheme.typography.labelSmall) },
+                                    modifier = Modifier.testTag("privacy_lang_$code")
+                                )
+                            }
+                        }
+                        Text(
+                            text = DpdpPrivacyRegistry.SUPPORTED_NOTICE_LANGUAGES[selectedLanguage]
+                                ?: DpdpPrivacyRegistry.SUPPORTED_NOTICE_LANGUAGES.getValue("en"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            OutlinedButton(
+                                onClick = {
+                                    val res = DpdpPrivacyRegistry.withdrawOptionalHealthProfileConsent(activePatientId)
+                                    consentRecord = DpdpPrivacyRegistry.getConsentRecord(activePatientId)
+                                    dpdpStatusMessage = res.resolutionSummary
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("withdraw_health_consent_btn"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Withdraw Health Consent", style = MaterialTheme.typography.labelSmall)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    val res = DpdpPrivacyRegistry.submitDataErasureOrAccountDeletionRequest(
+                                        userId = activePatientId,
+                                        hasRetainedClinicalConsultations = true
+                                    )
+                                    consentRecord = DpdpPrivacyRegistry.getConsentRecord(activePatientId)
+                                    dpdpStatusMessage = res.resolutionSummary
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("request_data_erasure_btn"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Request Erasure", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        Text(
+                            text = "Notice Version: ${consentRecord.noticeVersion} • Optional Health Consent: ${if (consentRecord.optionalHealthProfileConsentGranted) "Granted" else "Not Granted / Withdrawn"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+
+                        dpdpStatusMessage?.let { msg ->
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = msg,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    modifier = Modifier.padding(8.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // 4. SERVER & OFFLINE DEMO CONFIGURATION
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            text = stringResource(R.string.server_settings_title),
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold
+                        )
+                        OutlinedTextField(
+                            value = urlInput,
+                            onValueChange = { urlInput = it },
+                            label = { Text(stringResource(R.string.server_url_label)) },
+                            placeholder = { Text(stringResource(R.string.server_url_hint)) },
+                            singleLine = true,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("server_url_input")
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("Offline Demo Mode", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    "Simulate real-time queue without backend server",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = demoToggle,
+                                onCheckedChange = { demoToggle = it },
+                                modifier = Modifier.testTag("demo_mode_switch")
+                            )
+                        }
+                    }
+                }
+
+                // 5. ABOUT, HELP & LEGAL SUMMARY (P2)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "About SehatFlow",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Version 2.4.0 • Real-time Clinic Token & Queue Platform",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Support & Grievance Officer: privacy-grievance@sehatflow.app • Helpline: 1800-120-SEHAT",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = { onSaveServerConfig(urlInput, demoToggle) },
+                modifier = Modifier.testTag("save_server_settings_btn")
+            ) {
+                Text(stringResource(R.string.save_settings_btn))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.cancel_btn))
+            }
+        }
+    )
+}
+
+/**
+ * Optional Patient Health Profile Dialog (Specification Section 7).
+ * Allows patients to provide optional self-reported health details with explicit DPDP consent,
+ * or click "Skip for now" without fabricating defaults or blocking queue access.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun PatientHealthProfileDialog(
+    patientId: String,
+    onCompletedOrSkipped: (PatientHealthProfile) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val existing = remember(patientId) {
+        PatientHealthProfileRegistry.getAuthorizedHealthProfile(
+            patientId = patientId,
+            session = com.example.domain.model.UserSession(
+                token = "self",
+                userId = patientId,
+                displayName = "Patient",
+                role = com.example.domain.model.Role.PATIENT,
+                clinicId = null,
+                doctorId = null
+            )
+        )
+    }
+
+    var dobOrAge by remember(existing) { mutableStateOf(existing?.dateOfBirthOrAge ?: "") }
+    var selectedBloodGroup by remember(existing) { mutableStateOf(existing?.bloodGroup ?: "") }
+    var heightCm by remember(existing) { mutableStateOf(existing?.heightCm?.toString() ?: "") }
+    var weightKg by remember(existing) { mutableStateOf(existing?.weightKg?.toString() ?: "") }
+    var allergies by remember(existing) { mutableStateOf(existing?.knownAllergies ?: "") }
+    var conditions by remember(existing) { mutableStateOf(existing?.existingConditions ?: "") }
+    var medications by remember(existing) { mutableStateOf(existing?.currentMedications ?: "") }
+    var emergencyContact by remember(existing) { mutableStateOf(existing?.emergencyContact ?: "") }
+    var consentChecked by remember(existing) { mutableStateOf(existing?.consentGranted ?: false) }
+    var validationError by remember { mutableStateOf<String?>(null) }
+
+    val bloodGroupOptions = listOf("A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Favorite,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary
+            )
+        },
+        title = {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = stringResource(R.string.health_profile_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.tertiaryContainer
+                ) {
+                    Text(
+                        text = stringResource(R.string.health_profile_unverified_badge),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onTertiaryContainer,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                    )
+                }
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = stringResource(R.string.health_profile_subtitle),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                validationError?.let { err ->
+                    Surface(
+                        shape = RoundedCornerShape(8.dp),
+                        color = MaterialTheme.colorScheme.errorContainer,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = err,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            modifier = Modifier.padding(8.dp)
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = dobOrAge,
+                    onValueChange = { dobOrAge = it; validationError = null },
+                    label = { Text("Age or Date of Birth (Optional)") },
+                    placeholder = { Text("e.g. 34 yrs or 1992-05-14") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_dob_input")
+                )
+
+                Text(
+                    text = "Blood Group (Optional)",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    bloodGroupOptions.take(4).forEach { bg ->
+                        FilterChip(
+                            selected = selectedBloodGroup == bg,
+                            onClick = { selectedBloodGroup = if (selectedBloodGroup == bg) "" else bg },
+                            label = { Text(bg, style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    bloodGroupOptions.drop(4).forEach { bg ->
+                        FilterChip(
+                            selected = selectedBloodGroup == bg,
+                            onClick = { selectedBloodGroup = if (selectedBloodGroup == bg) "" else bg },
+                            label = { Text(bg, style = MaterialTheme.typography.labelSmall) },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    OutlinedTextField(
+                        value = heightCm,
+                        onValueChange = { heightCm = it; validationError = null },
+                        label = { Text("Height (cm)") },
+                        placeholder = { Text("170") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("health_height_input")
+                    )
+                    OutlinedTextField(
+                        value = weightKg,
+                        onValueChange = { weightKg = it; validationError = null },
+                        label = { Text("Weight (kg)") },
+                        placeholder = { Text("68") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("health_weight_input")
+                    )
+                }
+
+                OutlinedTextField(
+                    value = allergies,
+                    onValueChange = { allergies = it; validationError = null },
+                    label = { Text("Known Allergies (Optional)") },
+                    placeholder = { Text("e.g. Penicillin, Peanuts") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_allergies_input")
+                )
+
+                OutlinedTextField(
+                    value = conditions,
+                    onValueChange = { conditions = it; validationError = null },
+                    label = { Text("Existing Medical Conditions (Optional)") },
+                    placeholder = { Text("e.g. Hypertension, Type 2 Diabetes") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_conditions_input")
+                )
+
+                OutlinedTextField(
+                    value = medications,
+                    onValueChange = { medications = it; validationError = null },
+                    label = { Text("Current Medications (Optional)") },
+                    placeholder = { Text("e.g. Metformin 500mg") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_medications_input")
+                )
+
+                OutlinedTextField(
+                    value = emergencyContact,
+                    onValueChange = { emergencyContact = it; validationError = null },
+                    label = { Text("Emergency Contact (Optional)") },
+                    placeholder = { Text("e.g. +91-9830011223 (Spouse)") },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("health_emergency_input")
+                )
+
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = consentChecked,
+                            onCheckedChange = { consentChecked = it; validationError = null },
+                            modifier = Modifier.testTag("health_profile_consent_checkbox")
+                        )
+                        Text(
+                            text = "I consent to share these optional self-reported health details with my treating doctor for consultation preparation. I can withdraw consent anytime in Settings.",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    val result = PatientHealthProfileRegistry.saveOrUpdateHealthProfile(
+                        patientId = patientId,
+                        dateOfBirthOrAge = dobOrAge,
+                        bloodGroup = selectedBloodGroup,
+                        heightCmInput = heightCm,
+                        weightKgInput = weightKg,
+                        knownAllergies = allergies,
+                        existingConditions = conditions,
+                        currentMedications = medications,
+                        emergencyContact = emergencyContact,
+                        consentGranted = consentChecked
+                    )
+                    result.onSuccess { saved ->
+                        onCompletedOrSkipped(saved)
+                    }.onFailure { err ->
+                        validationError = err.message ?: "Please check your inputs."
+                    }
+                },
+                modifier = Modifier.testTag("health_profile_save_btn")
+            ) {
+                Text(stringResource(R.string.health_profile_save_btn))
+            }
+        },
+        dismissButton = {
+            TextButton(
+                onClick = {
+                    val skipped = PatientHealthProfileRegistry.skipHealthProfileOnboarding(patientId)
+                    onCompletedOrSkipped(skipped)
+                },
+                modifier = Modifier.testTag("health_profile_skip_btn")
+            ) {
+                Text(stringResource(R.string.health_profile_skip_btn), fontWeight = FontWeight.SemiBold)
+            }
+        }
+    )
+}

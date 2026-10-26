@@ -1,0 +1,108 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isAuthenticated() && request.auth.uid == uid;
+    }
+
+    function isClinicAdmin(clinicId) {
+      return isAuthenticated() &&
+             get(/databases/$(database)/documents/clinics/$(clinicId)).data.adminUid == request.auth.uid;
+    }
+
+    function isValidTimestamp(val) {
+      return val is timestamp && val <= request.time;
+    }
+
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() > 0 &&
+             data.email is string &&
+             data.displayName is string && data.displayName.size() > 0 &&
+             data.role in ['CLINIC_ADMIN', 'DOCTOR', 'RECEPTIONIST', 'PATIENT'];
+    }
+
+    function isValidClinic(data) {
+      return data.clinicId is string && data.clinicId.size() > 0 &&
+             data.name is string && data.name.size() > 0 &&
+             data.adminUid is string && data.adminUid.size() > 0 &&
+             data.subscriptionStatus in ['TRIAL', 'ACTIVE', 'EXPIRED'];
+    }
+
+    function isValidTokenItem(data) {
+      return data.clinicId is string && data.clinicId.size() > 0 &&
+             data.tokenNumber is number && data.tokenNumber > 0 &&
+             data.tokenCode is string && data.tokenCode.size() > 0 &&
+             data.patientName is string && data.patientName.size() > 0 &&
+             data.status in ['WAITING', 'CALLED', 'IN_CONSULTATION', 'COMPLETED', 'SKIPPED', 'NO_SHOW', 'CANCELLED'];
+    }
+
+    function isValidSubscription(data) {
+      return data.clinicId is string && data.clinicId.size() > 0 &&
+             data.adminUid is string && data.adminUid.size() > 0 &&
+             data.planName is string &&
+             data.amount is number && data.amount > 0 &&
+             data.status in ['ACTIVE', 'EXPIRED', 'PENDING'];
+    }
+
+    // Users collection - Strict ownership isolation to prevent BOLA PII scraping
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUserProfile(request.resource.data);
+      allow update: if isOwner(userId) && request.resource.data.userId == request.auth.uid && isValidUserProfile(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Clinics collection - Tenant isolation & admin ownership enforcement
+    match /clinics/{clinicId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.adminUid == request.auth.uid && isValidClinic(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.adminUid == request.auth.uid &&
+                       request.resource.data.adminUid == resource.data.adminUid &&
+                       isValidClinic(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.adminUid == request.auth.uid;
+
+      // Clinic tokens subcollection - Operational booking & queue metadata (No clinical notes/diagnoses)
+      match /tokens/{tokenId} {
+        allow read: if isAuthenticated() && (
+          resource.data.patientUid == request.auth.uid ||
+          isClinicAdmin(clinicId)
+        );
+        allow create: if isAuthenticated() && isValidTokenItem(request.resource.data) && (
+          request.resource.data.patientUid == request.auth.uid ||
+          isClinicAdmin(clinicId)
+        );
+        allow update: if isAuthenticated() && isValidTokenItem(request.resource.data) && (
+          resource.data.patientUid == request.auth.uid ||
+          isClinicAdmin(clinicId)
+        );
+        allow delete: if isClinicAdmin(clinicId);
+      }
+
+      // Clinical consultations subcollection - Strict separation from Receptionist & Admin operational access
+      // Only the treating Doctor (doctorUid) and the owning Patient (patientUid) can read clinical records; never auto-deleted.
+      match /consultations/{consultationId} {
+        allow read: if isAuthenticated() && (
+          resource.data.patientUid == request.auth.uid ||
+          resource.data.doctorUid == request.auth.uid
+        );
+        allow create, update: if isAuthenticated() &&
+          request.resource.data.doctorUid == request.auth.uid &&
+          request.resource.data.clinicId == clinicId;
+        allow delete: if false;
+      }
+    }
+
+    // Subscriptions collection - Strict owner isolation
+    match /subscriptions/{subscriptionId} {
+      allow read: if isAuthenticated() && resource.data.adminUid == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.adminUid == request.auth.uid && isValidSubscription(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.adminUid == request.auth.uid && isValidSubscription(request.resource.data);
+      allow delete: if false;
+    }
+  }
+}

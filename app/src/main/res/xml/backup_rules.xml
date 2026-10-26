@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<full-backup-content>
+    <!-- Exclude sensitive credentials, session tokens, local database, and prescription files from backup -->
+    <exclude domain="database" path="clinic_queue_local.db" />
+    <exclude domain="database" path="clinic_queue_local.db-journal" />
+    <exclude domain="database" path="clinic_queue_local.db-wal" />
+    <exclude domain="database" path="clinic_queue_local.db-shm" />
+    <exclude domain="sharedpref" path="clinic_queue_session" />
+    <exclude domain="file" path="datastore/" />
+    <exclude domain="file" path="prescriptions/" />
+</full-backup-content>

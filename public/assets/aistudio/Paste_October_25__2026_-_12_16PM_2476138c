@@ -1,0 +1,882 @@
+# SehatFlow: Patient Identification, Medical Record Access, Retention Policy and Compliance Audit
+
+## ROLE
+
+Act as a senior healthcare software architect, Android/full-stack engineer, database engineer, QA lead, and privacy-compliance analyst familiar with Indian healthcare software.
+
+SehatFlow is a clinic appointment, queue, and token-management application. It has separate experiences for patients, doctors, receptionists (front desk), and clinic administrators.
+
+The application has previously undergone UAT remediation and security hardening. Inspect the actual repository and existing reports before changing anything.
+
+Your mission is to implement the six requirements below, audit the existing application against them, verify the applicable Indian legal requirements using authoritative sources, fix identified defects, and run regression tests.
+
+**Do not stop after generating a plan or compliance report. Implement the required changes in the existing codebase.**
+
+Do not assume that previous security reports are correct without verifying the current implementation.
+
+---
+
+# REQUIREMENT 1 — PATIENT ID FOR QUICK IDENTIFICATION
+
+## Objective
+
+Every patient needs a unique, stable Patient ID that makes it easy for authorized staff to identify the correct patient without relying solely on a name or phone number.
+
+## 1.1 Patient ID generation
+
+Inspect the existing patient model, database, onboarding flow, and migration strategy.
+
+If a suitable patient identifier already exists, reuse it rather than introducing a duplicate identifier.
+
+Otherwise, implement a unique, persistent Patient ID.
+
+Requirements:
+
+- Every patient must have a unique identifier.
+- The identifier must remain stable across appointments, consultations, prescriptions, and profile updates.
+- The identifier must not change when the patient changes their phone number or name.
+- Concurrent patient registrations must not produce duplicate IDs.
+- The identifier must be generated and validated by the authoritative backend or data layer.
+- Do not use a sequential database ID as a publicly exposed identifier if doing so would unnecessarily disclose internal record counts or facilitate enumeration.
+- Do not include sensitive personal information in the identifier.
+- Do not use the patient's phone number as the primary identifier.
+- Do not create a new patient record every time a returning patient books an appointment.
+
+Choose an identifier format appropriate to the existing architecture. If a human-readable Patient ID is introduced, keep it separate from the internal database primary key where appropriate.
+
+## 1.2 Patient identification UI
+
+Display the Patient ID in appropriate locations.
+
+### Receptionist dashboard
+- Show the Patient ID in patient search results and booking details.
+- Allow authorized receptionists to search for a patient using the Patient ID.
+- Display the patient's name and phone number according to the front-desk permissions in Requirement 3.
+- Make the ID easy to copy or read during patient check-in.
+
+### Doctor dashboard
+- Show the Patient ID in the doctor's authorized patient and consultation views.
+- Allow doctors to search or filter using Patient ID, subject to their access permissions.
+
+### Patient dashboard
+- Display the patient's own Patient ID in a suitable profile or account section.
+
+Avoid placing unnecessary personal information on queue displays or publicly visible screens.
+
+## 1.3 Returning patient identification
+
+When a patient makes a new booking:
+
+- Attempt to identify the existing patient using a trusted authenticated patient ID or another approved matching workflow.
+- Avoid creating duplicate patient records.
+- If matching by phone number, account for phone-number changes, shared family phone numbers, and verification requirements.
+- Do not merge records automatically based only on matching names.
+- Require an appropriate verification or authorized staff process when identity is ambiguous.
+- Preserve existing appointments and clinical records when a patient profile is updated.
+
+## 1.4 Tests
+
+Verify:
+
+- Patient IDs are unique.
+- Patient IDs remain stable after profile changes.
+- Concurrent registrations cannot generate duplicate IDs.
+- Existing patients can be identified correctly.
+- New patients receive an ID.
+- Patient ID search works in authorized dashboards.
+- Unauthorized users cannot enumerate or retrieve other patients' information by changing IDs.
+- Existing patient records survive migrations without losing their relationships.
+
+---
+
+# REQUIREMENT 2 — DOCTORS MUST BE ABLE TO VIEW PATIENT MEDICAL RECORDS
+
+## Current problem
+
+Doctors can currently see uploaded prescriptions, but the broader patient medical history is not available through the application.
+
+This is insufficient for a useful consultation workflow.
+
+Audit the existing data model first. Do not assume that prescription files contain the complete medical record.
+
+## 2.1 Establish what a medical record means in the current application
+
+Inventory all existing patient-related information, including:
+
+- Patient profile and demographics.
+- Past consultations.
+- Consultation dates and outcomes.
+- Recorded symptoms or presenting complaints.
+- Clinical notes, if implemented.
+- Diagnoses or assessments, if implemented.
+- Prescriptions and uploaded prescription files.
+- Follow-up instructions.
+- Relevant attachments.
+- Allergies, medical history, or medication history, if supported.
+- Appointment and token history.
+- Other existing clinical information.
+
+Separate clinical records from operational records.
+
+A booking or token is not itself a completed consultation or a complete medical record.
+
+Do not fabricate missing clinical information or silently interpret an uploaded prescription as a complete clinical history.
+
+## 2.2 Doctor-facing patient history
+
+Implement an authorized patient medical-history view in the doctor dashboard.
+
+When a doctor opens an authorized patient's record, show the available historical clinical information in a clear, chronological timeline.
+
+Where data exists, the timeline should include:
+
+- Consultation date and time.
+- Patient ID.
+- Treating doctor.
+- Clinic and chamber.
+- Presenting complaint.
+- Clinical notes.
+- Recorded diagnosis or assessment.
+- Prescription and associated documents.
+- Follow-up instructions.
+- Consultation status.
+
+Show only the fields that exist and are authorized for the doctor to view.
+
+If a record does not contain clinical notes, diagnoses, or other information, show that the information was not recorded rather than inventing values.
+
+## 2.3 Consultation details
+
+Allow doctors to open an individual historical consultation.
+
+The details screen should display the original consultation information and associated prescriptions or documents.
+
+Ensure:
+
+- The correct patient is shown.
+- The correct treating doctor is shown.
+- The original clinic and chamber are preserved.
+- The original consultation date is preserved.
+- Prescriptions are linked to the correct consultation.
+- Historical data is not silently rewritten when the doctor's profile or clinic association changes.
+- Clinical corrections follow an appropriate authorized workflow and preserve auditability.
+
+If the current application does not support structured consultation notes, document the gap and implement the minimum appropriate data model and UI needed for the supported workflow.
+
+Do not invent a comprehensive electronic health record system unrelated to the current scope.
+
+## 2.4 Doctor access restrictions
+
+A doctor must not automatically gain unrestricted access to every patient in the system merely because they have a doctor account.
+
+Enforce authorization through the authoritative backend or database security rules.
+
+Access should be based on the application's approved clinical and operational model, including applicable patient consent, assigned clinics, legitimate care relationships, and authorized workflows.
+
+Test:
+
+- A doctor viewing an authorized patient's history.
+- A doctor attempting to view an unrelated patient's history.
+- A doctor attempting to change a patient ID in an API request.
+- A doctor accessing a historical prescription through a direct document URL.
+- A doctor accessing a record from an unrelated clinic.
+- A doctor viewing their own historical consultations across authorized clinics.
+- An unauthorized user attempting to access consultation details.
+
+Frontend filtering alone is not authorization.
+
+---
+
+# REQUIREMENT 3 — STRICT SEPARATION BETWEEN RECEPTIONIST AND DOCTOR ACCESS
+
+## Core rule
+
+**Receptionists must have access to patient phone numbers for legitimate front-desk operations, but must not have access to patients' medical records. Doctors must have access to authorized medical records, but must not receive unrestricted access to patient contact details.**
+
+Implement this as a backend-enforced, deny-by-default permission model.
+
+Do not rely only on hiding UI elements.
+
+## 3.1 Receptionist permissions
+
+Receptionists should be able to access only the information necessary for front-desk duties.
+
+Expected access:
+
+- Patient ID.
+- Patient name for identification.
+- Patient phone number.
+- Appointment or token information.
+- Booking status.
+- Check-in status.
+- Assigned doctor.
+- Relevant clinic and chamber.
+- Presenting complaint needed for triage or assignment, where authorized.
+- Prescription attachment and approval status only if required by the defined workflow and explicitly permitted.
+
+**Receptionists must not have routine access to clinical medical records**, including:
+
+- Clinical consultation notes.
+- Detailed medical history.
+- Diagnoses.
+- Doctor-authored assessments.
+- Clinical treatment plans.
+- Historical clinical notes.
+- Prescription contents, unless a specific authorized workflow and applicable requirements justify that access.
+
+A prescription upload required for appointment approval must not automatically give the receptionist unrestricted access to the patient's complete medical history.
+
+If the existing booking workflow requires receptionists to verify that an attachment exists, provide the minimum metadata needed for that task without exposing the document's contents.
+
+Where prescription review is genuinely required, document the exception and implement narrowly scoped access rather than silently granting broad permissions.
+
+## 3.2 Doctor permissions
+
+Doctors should be able to access:
+
+- Patient ID.
+- The patient identity information required for safe clinical identification.
+- Authorized medical history.
+- Consultation records.
+- Relevant prescriptions and medical documents.
+- Relevant presenting complaints.
+- Relevant appointment information.
+- Clinic and chamber context.
+- Other clinical information explicitly supported by the product and authorized by the access model.
+
+Do not expose unrestricted operational, administrative, or account-management capabilities to doctors.
+
+Patient contact details should not be displayed by default unless they are needed for an authorized workflow. If a legitimate use case requires phone-number access, make that access explicit and appropriately controlled.
+
+## 3.3 Administrator permissions
+
+Audit clinic administrator and platform administrator roles separately.
+
+Do not automatically grant administrators unrestricted access to clinical notes or prescriptions.
+
+Separate:
+
+- Operational administration.
+- Staff and clinic management.
+- Clinical record access.
+- Platform-level diagnostics.
+- Security audit access.
+
+Any privileged access to sensitive clinical information must be explicitly authorized and auditable.
+
+## 3.4 Implement permissions end to end
+
+Audit:
+
+- Frontend components.
+- Backend APIs.
+- Data transfer objects.
+- Database queries.
+- Firestore security rules or equivalent authorization policies.
+- Attachment storage rules.
+- Direct file URLs.
+- Search and export endpoints.
+- Cached and locally persisted patient data.
+- Historical record retrieval.
+- Administrative tools.
+
+Use the existing authorization architecture where possible.
+
+Return only the fields each role needs. Do not send a complete patient record to the receptionist's frontend and merely hide sensitive fields in the UI.
+
+Apply object-level authorization to every patient, consultation, prescription, and attachment request.
+
+## 3.5 Permission matrix
+
+Document and implement a matrix similar to this, adapting it to the application's actual roles and workflow.
+
+| Data category | Patient | Doctor | Receptionist | Clinic admin |
+|---|---|---|---|---|
+| Patient's own Patient ID | Own | Authorized patient context | Assigned clinic workflow | Operationally authorized |
+| Patient name | Own | Authorized patient context | Assigned clinic workflow | Operationally authorized |
+| Patient phone number | Own | Only when justified by an authorized workflow | Yes, for assigned clinic operations | Only when needed for authorized operations |
+| Appointment/token status | Own | Relevant authorized appointments | Assigned clinic operations | Authorized clinic operations |
+| Presenting complaint | Own | Authorized clinical context | Minimum needed for triage or assignment | No routine clinical access |
+| Clinical notes | Own records as supported | Authorized clinical context | No routine access | No routine access by default |
+| Diagnoses and assessments | Own records as supported | Authorized clinical context | No routine access | No routine access by default |
+| Prescription contents | Own records | Authorized clinical context | No routine access by default | No routine access by default |
+| Uploaded prescription metadata | Own records | Authorized clinical context | Minimum metadata needed for booking workflow | Minimum operational metadata |
+| Security audit logs | No general access | No general access | No general access | Explicitly authorized access |
+
+Do not treat this table as permission to expose every category to every role. Implement the least-privilege policy and document justified exceptions.
+
+---
+
+# REQUIREMENT 4 — TWO-YEAR HISTORICAL ACCESS RULE
+
+## Business requirement
+
+Doctors and receptionists must be able to view historical operational records for up to two years, but only for records that meet the approved eligibility criteria:
+
+- Completed appointments or visits; or
+- Records for which the required medical records have been provided, according to a clearly defined and documented status.
+
+Interpret the phrase "medical records provided" carefully. Do not infer that an entire consultation is complete simply because a prescription file was uploaded.
+
+## 4.1 Define the eligibility rule
+
+Inspect the existing booking, token, appointment, and consultation statuses.
+
+Create an explicit eligibility rule that distinguishes:
+
+- Pending booking requests.
+- Approved appointments.
+- Checked-in patients.
+- In-progress consultations.
+- Completed appointments.
+- Completed consultations.
+- Cancelled appointments.
+- Rejected requests.
+- No-shows.
+- Records with an uploaded prescription.
+- Records with completed clinical documentation.
+
+Use the actual application lifecycle and define which records qualify for historical access.
+
+A suitable initial business rule is:
+
+- Completed visits and completed consultations are eligible for historical views.
+- A record with medical documentation is eligible only if the required documentation state has been explicitly recorded and the business rule permits it.
+- Pending, rejected, cancelled, or otherwise incomplete records must not be incorrectly presented as completed consultations.
+- Any exception for records with provided documentation must be explicitly represented by a reliable backend status or equivalent persisted condition.
+
+Do not use a loose condition such as "prescription URL is not null" as the sole proof that a consultation was completed.
+
+## 4.2 Two-year access window
+
+Implement a default historical query window of the most recent two years for authorized doctor and receptionist views.
+
+The window should be calculated using the relevant appointment or consultation timestamp and the application's timezone rules.
+
+For example, if the current date is 25 October 2026, the default historical window begins on the corresponding date two years earlier, subject to correct date-boundary handling.
+
+Requirements:
+
+- Display the active date range.
+- Provide useful date filters within the permitted window.
+- Ensure records older than two years do not appear in routine views covered by this rule.
+- Do not delete older records merely because they fall outside the default access window.
+- Do not expose older records through an unfiltered endpoint if the intended role-specific policy restricts them.
+- If a separate legally required or explicitly authorized access path is needed for older records, define and audit it separately.
+- Apply the same policy consistently across search, exports, pagination, API endpoints, and direct record retrieval.
+- Preserve records for longer if applicable retention requirements require it.
+
+The two-year window is a business access rule, not an automatic data destruction policy.
+
+## 4.3 Doctor history
+
+Doctors should be able to filter their eligible historical records by:
+
+- Date range.
+- Patient ID.
+- Patient name.
+- Clinic.
+- Chamber.
+- Consultation status.
+- Prescription or documentation status.
+
+Enforce the doctor’s authorized clinical scope on the backend.
+
+## 4.4 Receptionist history
+
+Receptionists should be able to filter their eligible historical operational records by:
+
+- Date range.
+- Patient ID.
+- Patient name.
+- Patient phone number.
+- Doctor.
+- Clinic.
+- Chamber.
+- Token number.
+- Booking status.
+- Check-in or attendance status.
+
+Receptionists must not gain access to clinical notes or detailed medical history through the history endpoint or its filters.
+
+## 4.5 Retention versus access
+
+Implement two separate concepts:
+
+1. **Historical visibility:** which records appear in a routine dashboard.
+2. **Record retention:** how long the underlying data must remain stored.
+
+Do not delete records at the end of the two-year visibility window.
+
+Do not automatically purge a patient's medical records when they leave the app or close their account.
+
+Retention, archival, and deletion must follow the approved policy and applicable legal obligations.
+
+## 4.6 Tests
+
+Test:
+
+- Records within the two-year window.
+- Records exactly at the date boundary.
+- Records outside the routine window.
+- Completed appointments.
+- Completed consultations.
+- Pending and cancelled appointments.
+- No-shows.
+- Records with an uploaded prescription but no completed consultation.
+- Records with completed clinical documentation.
+- Unauthorized attempts to retrieve older records directly.
+- Filter combinations.
+- Pagination.
+- Timezone boundaries.
+- Retention of records outside the visible window.
+
+---
+
+# REQUIREMENT 5 — NEW PATIENTS, OPTIONAL PRESCRIPTIONS AND PROBLEM-BASED DOCTOR ASSIGNMENT
+
+## Business requirement
+
+When a patient books a new appointment and no prescription is available, the application must not block booking simply because the patient has no prescription.
+
+The patient must be able to describe the problem they are experiencing.
+
+The receptionist should then be able to assign the patient to an appropriate doctor using the presenting complaint, available specialties, clinic schedules, and capacity.
+
+Do not treat the absence of a prescription as definitive proof that the patient is new. Returning patients may also seek care for a new problem without having a prescription.
+
+## 5.1 Booking flow
+
+Inspect and update the patient booking flow.
+
+The patient should be able to:
+
+1. Select a doctor or request help finding an appropriate doctor, according to the supported workflow.
+2. Select the clinic and eligible appointment date where applicable.
+3. Enter a short description of the presenting problem.
+4. Upload a prescription if one is available.
+5. Skip prescription upload if no prescription is available.
+6. Submit the request.
+7. Receive a clear confirmation and booking/request status.
+
+Prescription upload must be optional for the new-patient or no-prescription workflow.
+
+Do not make it globally optional for workflows where an existing business or clinical requirement explicitly mandates a document without first documenting and resolving that requirement.
+
+The patient should not need to invent or upload a prescription just to complete an appointment request.
+
+## 5.2 Presenting complaint
+
+Add or reuse a persisted presenting-complaint field.
+
+Requirements:
+
+- Clearly label it, for example, "What problem are you experiencing?"
+- Allow a short free-text description.
+- Apply sensible length limits.
+- Reject empty or whitespace-only values if a complaint is required by the workflow.
+- Validate the field on the backend.
+- Handle unsupported characters and long input safely.
+- Avoid requesting unnecessary sensitive information.
+- Explain that this information helps clinic staff direct the appointment.
+- Do not present the field as a diagnosis.
+- Do not automatically generate or assert a medical diagnosis.
+
+Treat the complaint as sensitive health information.
+
+Do not expose it to every receptionist, administrator, or other user by default. Implement the minimum access required for triage and assignment, and document the authorization policy.
+
+## 5.3 New versus returning patient
+
+Determine whether a patient is new or returning using a trusted patient identity and existing patient record, not solely by whether a prescription was uploaded.
+
+Recommended behavior:
+
+- Existing authenticated patient with a known Patient ID: link the new appointment to that patient.
+- New patient with no existing record: create the patient record through the approved onboarding flow.
+- Ambiguous identity: request verification or authorized staff resolution.
+- Returning patient with no prescription: allow the booking workflow to continue.
+- New patient with a prescription: allow upload without creating a duplicate patient record if an existing identity can be verified.
+
+Do not create duplicate patient records based only on different phone numbers or spelling variations.
+
+## 5.4 Receptionist assignment workflow
+
+Provide an appropriate receptionist workflow for reviewing unassigned appointment requests.
+
+The receptionist should see the minimum information needed to route the patient:
+
+- Patient ID.
+- Patient name.
+- Patient phone number.
+- Presenting complaint, only as permitted by the explicit triage/assignment policy.
+- Requested date and clinic.
+- Available doctors and relevant specialties.
+- Doctor schedule.
+- Clinic and chamber.
+- Available capacity.
+- Prescription attachment availability/status.
+
+The receptionist should be able to:
+
+1. Review the request.
+2. Search or filter available doctors.
+3. See each doctor's supported specialty and schedule.
+4. Select an eligible doctor.
+5. Confirm that the doctor is available at the selected clinic and chamber.
+6. Confirm the appointment date and remaining capacity.
+7. Assign the patient to that doctor.
+8. Save the assignment.
+9. See a clear success or failure result.
+10. Notify or update the patient according to the existing notification capabilities.
+
+Do not allow assignment to a doctor who is not configured for the selected clinic, chamber, date, or session.
+
+Do not overbook a session.
+
+If the requested session is full, offer other eligible sessions or return the request for explicit patient confirmation. Do not silently switch the patient to another clinic.
+
+## 5.5 Assignment safety
+
+Do not implement autonomous diagnosis or high-risk medical triage as part of this task.
+
+The presenting complaint can help the receptionist choose among available specialties, but the receptionist must not be represented as diagnosing the patient.
+
+If the complaint indicates an emergency, the UI may display a carefully worded instruction to seek immediate emergency care according to an approved clinical workflow. Do not claim that a simple keyword rule reliably detects all emergencies.
+
+Do not use an LLM to make an unreviewed medical diagnosis or silently decide a patient's treatment.
+
+## 5.6 Tests
+
+Verify:
+
+- New patient without prescription can request an appointment.
+- Returning patient without prescription can request an appointment.
+- Patient with prescription can upload it.
+- Invalid or oversized uploads are rejected according to existing constraints.
+- Missing complaint is handled according to the defined workflow.
+- Patient identity is linked correctly.
+- Duplicate patient creation is prevented.
+- Receptionist can assign an eligible doctor.
+- Ineligible doctors are excluded.
+- Full sessions cannot be overbooked.
+- Patient and receptionist see consistent assignment status.
+- Complaint access is denied to unauthorized roles.
+- Assignment changes are auditable.
+
+---
+
+# REQUIREMENT 6 — VERIFY INDIAN LAW AND AUDIT THE APP
+
+## Objective
+
+Conduct an evidence-based audit of the application's current medical-record access, retention, storage, privacy, and deletion behavior against applicable Indian requirements.
+
+The legal information supplied in this task is a starting point, not a definitive interpretation of the law.
+
+**Do not treat the supplied legal summary or its third-party citations as verified law.**
+
+## 6.1 Verify authoritative sources
+
+Research the current versions, amendments, commencement notifications, and applicability of relevant sources, including:
+
+- Digital Personal Data Protection Act, 2023.
+- Digital Personal Data Protection Rules, 2025, including applicable commencement dates and amendments.
+- Information Technology Act, 2000 and applicable provisions or rules relevant to sensitive personal data and information, subject to current legal status and applicability.
+- Applicable National Medical Commission regulations and professional conduct rules.
+- Clinical Establishments (Registration and Regulation) Act, 2010 and relevant rules, where applicable to the facility and jurisdiction.
+- Applicable West Bengal laws, rules, and clinical-establishment requirements, because the intended deployment may involve clinics in West Bengal.
+- Ayushman Bharat Digital Mission policies and Health Data Management Policy, if SehatFlow intends to participate in or integrate with ABDM.
+- Other applicable healthcare recordkeeping, privacy, cybersecurity, and professional obligations relevant to the actual service model.
+
+Prefer official legislation, government notifications, official regulatory documents, and primary-source policy documents.
+
+For each legal requirement, record:
+
+- Exact source and relevant provision.
+- Official source URL.
+- Publication or amendment date, where available.
+- Current legal status.
+- Effective date or commencement status.
+- Which entities or facilities it applies to.
+- Whether it applies to SehatFlow, its clinic customers, or both.
+- What the current application does.
+- What the application needs to change.
+- Whether legal counsel must confirm the interpretation.
+
+Do not claim that a law applies to all clinics in India if its geographic, institutional, or professional scope is limited.
+
+## 6.2 DPDP Act and Rules
+
+Verify the phased commencement of the DPDP Act and Rules as of the date of this audit.
+
+Do not assume that every provision was effective on the date the Act was passed or when the Rules were notified.
+
+Assess the application against relevant requirements concerning:
+
+- Lawful processing.
+- Notice and consent where applicable.
+- Purpose limitation.
+- Data minimization.
+- Accuracy.
+- Security safeguards.
+- Data retention and erasure.
+- Patient rights.
+- Grievance handling.
+- Data breaches and incident response.
+- Children's personal data, where applicable.
+- Processor and service-provider responsibilities.
+- Account deletion and data lifecycle management.
+
+Determine which obligations are currently in force and which have future commencement dates.
+
+Clearly distinguish:
+
+1. Requirements currently in force.
+2. Requirements enacted but not yet in force.
+3. Recommended future-readiness measures.
+4. Questions requiring legal confirmation.
+
+Do not assume that health data automatically has a single special-category status under the DPDP Act merely because it is sensitive in practice. Verify the actual statutory definitions and applicable obligations.
+
+## 6.3 Medical-record retention
+
+Audit the supplied claims about:
+
+- Three-year retention of standard medical records.
+- Longer retention for inpatient or digitized inpatient records.
+- Medicolegal records.
+- Records concerning minors.
+- ICU or high-risk surgical records.
+- State-specific retention requirements.
+- Requests for medical-record copies and applicable response timelines.
+
+Do not accept the supplied retention table without verification.
+
+In particular:
+
+- Verify the scope of the NMC's medical-record provisions.
+- Distinguish inpatient from outpatient records.
+- Distinguish a physician's obligations from a clinic or hospital's obligations.
+- Determine whether specific state rules apply.
+- Identify the actual records maintained by SehatFlow.
+- Do not invent universal 5-, 7-, or 10-year requirements without authoritative support.
+- Do not automatically apply a retention period to every data category simply because it applies to a particular class of medical records.
+
+If a definitive period cannot be established from authoritative sources, record the issue for legal review rather than inventing one.
+
+## 6.4 Requests for medical-record copies
+
+Verify the applicable response timelines for patient or authorized-representative requests.
+
+Do not hardcode a 72-hour deadline across all requests merely because one cited provision specifies that period for a particular context.
+
+Where the applicable policy requires a response workflow, implement or recommend:
+
+- Request submission.
+- Identity and authority verification.
+- Request tracking.
+- Status and timestamps.
+- Responsible clinic or data custodian.
+- Response deadline based on the applicable rule.
+- Secure delivery.
+- Audit trail.
+- Escalation for overdue requests.
+
+## 6.5 Audit data storage and security
+
+Inspect the actual storage architecture.
+
+Identify:
+
+- Where patient profiles are stored.
+- Where clinical records are stored.
+- Where prescriptions and attachments are stored.
+- Whether data is replicated to external providers.
+- Which systems and users can access the data.
+- Whether local device storage contains patient information.
+- Whether logs contain sensitive information.
+- Whether backups contain patient records.
+- Whether exports can bypass permissions.
+- Whether deletion propagates appropriately to replicas and backups.
+- Whether retention policies can be enforced per record category.
+
+Review authentication, authorization, tenant isolation, attachment permissions, audit logs, backup controls, and encryption where relevant.
+
+Do not claim that the app is legally compliant merely because database security rules exist.
+
+## 6.6 Data lifecycle policy
+
+Create or update:
+
+`docs/DATA_RETENTION_AND_PRIVACY_POLICY.md`
+
+The policy must distinguish:
+
+- Data collection.
+- Active storage.
+- Routine historical visibility.
+- Archival.
+- Patient access requests.
+- Correction requests.
+- Account closure.
+- Retention obligations.
+- Legal holds.
+- Deletion.
+- Anonymization.
+- Backup expiration.
+
+The two-year routine historical access window must not be treated as a blanket retention limit.
+
+Do not implement irreversible bulk deletion without an approved policy and verified legal requirements.
+
+Do not promise immediate deletion of every medical record when a patient closes an account without considering applicable obligations.
+
+Do not retain data indefinitely by default either: define the lawful purpose, retention basis, and disposition process for each category.
+
+## 6.7 Compliance audit deliverables
+
+Create or update:
+
+- `security/INDIA_HEALTH_DATA_COMPLIANCE_AUDIT.md`
+- `docs/DATA_RETENTION_AND_PRIVACY_POLICY.md`
+- `docs/PATIENT_DATA_ACCESS_MATRIX.md`
+- `docs/PATIENT_ID_AND_MEDICAL_HISTORY.md`
+- `uat/MEDICAL_HISTORY_ACCESS_TESTS.md`
+- `uat/REGRESSION_RESULTS.md`
+
+Adapt paths to the existing repository conventions.
+
+Include findings classified as:
+
+- Critical.
+- High.
+- Medium.
+- Low.
+- Legal review required.
+- Not applicable, with justification.
+
+For each finding, record:
+
+- Requirement or source.
+- Evidence in the current application.
+- Actual defect or gap.
+- Recommended fix.
+- Implementation status.
+- Verification result.
+- Remaining uncertainty.
+
+---
+
+# IMPLEMENTATION AND TESTING REQUIREMENTS
+
+## A. Preserve the existing architecture
+
+Inspect the current Android app, backend, authentication, database, and storage architecture before implementation.
+
+Reuse existing models and services where possible.
+
+Do not hardcode patient records, clinic names, doctor lists, retention periods, or permission decisions into the frontend.
+
+Use migrations where required, and preserve existing patient records and relationships.
+
+## B. Enforce access control at the data layer
+
+The backend or authoritative data security layer must enforce permissions for:
+
+- Patient profiles.
+- Phone numbers.
+- Presenting complaints.
+- Consultations.
+- Clinical notes.
+- Diagnoses.
+- Prescriptions.
+- Attachments.
+- Historical records.
+- Search results.
+- Exports.
+
+Test direct API and document access, not only the UI.
+
+## C. Data integrity
+
+Verify that:
+
+- One patient has a stable Patient ID.
+- Appointments link to the correct patient.
+- Consultations link to the correct patient.
+- Prescriptions link to the correct patient and consultation.
+- Doctor, clinic, and chamber relationships remain correct.
+- Historical records preserve their original context.
+- Record status changes are consistent.
+- Duplicate patient records are prevented where identity can be reliably established.
+- Concurrent bookings cannot create duplicate tokens or exceed capacity.
+
+## D. Regression tests
+
+Run the existing test suite and add coverage for all six requirements.
+
+At minimum, test:
+
+- Patient ID generation and search.
+- Doctor medical-history access.
+- Receptionist medical-record denial.
+- Phone-number access by role.
+- Historical access eligibility.
+- Two-year default access window.
+- Retention of records outside that window.
+- Optional prescription upload.
+- Presenting complaint persistence.
+- Receptionist doctor assignment.
+- Clinic and chamber constraints.
+- Unauthorized record access.
+- Existing appointment and token flows.
+- Existing authentication and logout behavior.
+- Existing UAT and security regressions.
+
+Do not weaken assertions or remove tests to achieve a passing result.
+
+Report actual executed test results. If a test cannot run, document the blocker.
+
+---
+
+# FINAL ACCEPTANCE CRITERIA
+
+The work is complete only when:
+
+1. Every patient has a stable, unique Patient ID.
+2. Doctors can view authorized patients' medical history rather than only prescription files.
+3. Receptionists cannot access clinical records through the UI, API, database rules, or direct attachment access unless a documented, narrowly scoped exception applies.
+4. Phone-number access follows the defined role permissions.
+5. Eligible completed or appropriately documented records are available within the two-year historical window.
+6. Records outside that window are not automatically deleted.
+7. New and returning patients can request appointments without a prescription when the workflow permits it.
+8. Patients can describe their presenting complaint.
+9. Receptionists can assign an appropriate available doctor without bypassing schedule, clinic, chamber, or capacity rules.
+10. Indian legal requirements have been checked against authoritative sources and applicable commencement dates.
+11. The retention policy distinguishes legal obligations from product defaults.
+12. Regression tests validate the implemented behavior.
+13. All remaining defects, legal questions, and blocked tests are documented accurately.
+
+## FINAL EXECUTION INSTRUCTIONS
+
+Start by inspecting the codebase and current reports.
+
+Then:
+
+1. Produce a brief evidence-based baseline.
+2. Implement Patient ID and the necessary UI.
+3. Implement doctor medical-history access.
+4. Enforce role-specific access restrictions.
+5. Implement the two-year historical access policy.
+6. Implement optional prescription upload and presenting-complaint-based assignment.
+7. Verify the applicable Indian legal framework.
+8. Fix identified defects.
+9. Run regression tests.
+10. Update the documentation and provide a concise final handover.
+
+**Do not stop after writing a plan. Implement the changes.**
+
+**Do not claim legal compliance without evidence and appropriate qualification.**
+
+**Do not treat a two-year UI visibility rule as authorization to delete older medical records.**
