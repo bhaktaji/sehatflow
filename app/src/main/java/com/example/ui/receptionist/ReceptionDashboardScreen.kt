@@ -260,7 +260,7 @@ fun ReceptionDashboardScreen(
                 shape = RoundedCornerShape(10.dp)
             )
 
-            // Chamber Filter & UAT Helper Toolbar
+            // Chamber Filter Toolbar
             var selectedChamberFilter by remember { mutableStateOf("All Chambers") }
             val chamberOptions = listOf("All Chambers", "Chamber A (Dr. John)", "Chamber B (Dr. Donna)", "Chamber C (Dr. Alex)")
 
@@ -284,18 +284,6 @@ fun ReceptionDashboardScreen(
                             modifier = Modifier.testTag("chamber_chip_${chamberName.take(9).replace(" ", "_")}")
                         )
                     }
-                }
-
-                Spacer(modifier = Modifier.width(8.dp))
-                FilledTonalButton(
-                    onClick = {
-                        com.example.core.demo.DemoDataProvider.populateLargeQueueForTesting(35)
-                        viewModel.loadSessions()
-                    },
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
-                    modifier = Modifier.testTag("btn_populate_35_uat")
-                ) {
-                    Text("UAT: 35 Q", style = MaterialTheme.typography.labelSmall)
                 }
             }
 

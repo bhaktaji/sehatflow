@@ -205,7 +205,7 @@ class AuthRepositoryImpl(
     private fun formatNetworkError(e: Exception): String {
         return if (isConnectionException(e)) {
             val currentUrl = sessionPreferences.getServerUrlSync()
-            "Cannot reach server at $currentUrl. Check if Spring Boot is running on port 8090, configure host IP in Server Settings, or tap 'Explore Demo Mode'."
+            "Cannot reach clinic server at $currentUrl. Please check your network connection or verify the API endpoint in Settings."
         } else {
             e.message ?: "Request failed"
         }

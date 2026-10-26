@@ -1,0 +1,74 @@
+server:
+  port: ${SERVER_PORT:8080}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+  servlet:
+    session:
+      timeout: ${APP_SESSION_TIMEOUT:12h}
+      cookie:
+        name: JSESSIONID
+        http-only: true
+        same-site: ${APP_COOKIE_SAME_SITE:Lax}
+        secure: ${APP_COOKIE_SECURE:true}
+
+spring:
+  application:
+    name: clinic-queue-backend
+  datasource:
+    url: ${APP_DB_URL:jdbc:postgresql://postgres:5432/sehatflow_clinic_prod}
+    username: ${APP_DB_USER:sehatflow_db_admin}
+    password: ${APP_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${APP_DB_POOL_MAX:20}
+      minimum-idle: ${APP_DB_POOL_MIN:5}
+      connection-timeout: 20000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    baseline-on-migrate: false
+  mvc:
+    problemdetails:
+      enabled: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
+springdoc:
+  api-docs:
+    enabled: ${APP_SWAGGER_ENABLED:false}
+  swagger-ui:
+    enabled: ${APP_SWAGGER_ENABLED:false}
+
+app:
+  security:
+    bcrypt-strength: ${APP_BCRYPT_STRENGTH:12}
+    cookie-secure: ${APP_COOKIE_SECURE:true}
+  seed:
+    # CRITICAL: Never seed demo credentials in production
+    enabled: ${APP_SEED_ENABLED:false}
+  ratelimit:
+    login-per-minute: ${APP_LOGIN_RATE:30}
+    public-per-minute: ${APP_PUBLIC_RATE:180}

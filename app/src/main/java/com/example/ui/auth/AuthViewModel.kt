@@ -82,6 +82,32 @@ class AuthViewModel(
         }
     }
 
+    fun completeStaffInviteOnboarding(
+        assignedRole: com.example.data.model.UserRole?,
+        clinicId: String?,
+        actorId: String
+    ) {
+        val domainRole = when (assignedRole) {
+            com.example.data.model.UserRole.DOCTOR -> Role.DOCTOR
+            com.example.data.model.UserRole.RECEPTIONIST -> Role.RECEPTIONIST
+            com.example.data.model.UserRole.CLINIC_ADMIN -> Role.OWNER
+            else -> return
+        }
+        viewModelScope.launch {
+            val resolvedClinicId = clinicId?.ifBlank { "clinic_xyz" } ?: "clinic_xyz"
+            val session = UserSession(
+                token = "staff_invite_${actorId}_${System.currentTimeMillis()}",
+                userId = actorId,
+                displayName = if (domainRole == Role.DOCTOR) "Dr. ${actorId.replaceFirstChar { it.uppercase() }}" else "Clinic Reception",
+                role = domainRole,
+                clinicId = resolvedClinicId,
+                doctorId = if (domainRole == Role.DOCTOR) "doc_john" else null
+            )
+            ServiceLocator.sessionPreferences.saveSession(session)
+            _uiState.value = _uiState.value.copy(isLoading = false, errorMessage = null)
+        }
+    }
+
     fun updateServerUrl(url: String) {
         viewModelScope.launch {
             runCatching {

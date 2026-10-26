@@ -422,7 +422,7 @@ class QueueRepositoryImpl(
             e.message?.contains("ECONNREFUSED", ignoreCase = true) == true
         ) {
             val url = sessionPreferences.getServerUrlSync()
-            "Cannot connect to server at $url. Check if Spring Boot is running on port 8090, or customize server IP / switch to Demo Mode."
+            "Cannot connect to clinic server at $url. Please check your internet connection or verify the server endpoint in Settings."
         } else {
             e.message ?: "Operation failed"
         }

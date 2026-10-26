@@ -1,0 +1,62 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: sehatflow-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sehatflow_clinic_prod}
+      POSTGRES_USER: ${POSTGRES_USER:-sehatflow_db_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Sf9xK2mP7vQ4nL8wR3tY6uJ1hG5bN0cZ}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - sehatflow_internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-sehatflow_db_admin} -d $${POSTGRES_DB:-sehatflow_clinic_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: sehatflow-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      SERVER_PORT: ${SERVER_PORT:-8080}
+      APP_SESSION_TIMEOUT: ${APP_SESSION_TIMEOUT:-12h}
+      APP_DB_URL: ${APP_DB_URL:-jdbc:postgresql://postgres:5432/sehatflow_clinic_prod}
+      APP_DB_USER: ${APP_DB_USER:-sehatflow_db_admin}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-Sf9xK2mP7vQ4nL8wR3tY6uJ1hG5bN0cZ}
+      APP_DB_POOL_MAX: ${APP_DB_POOL_MAX:-20}
+      APP_DB_POOL_MIN: ${APP_DB_POOL_MIN:-5}
+      APP_COOKIE_SECURE: ${APP_COOKIE_SECURE:-true}
+      APP_COOKIE_SAME_SITE: ${APP_COOKIE_SAME_SITE:-Lax}
+      APP_BCRYPT_STRENGTH: ${APP_BCRYPT_STRENGTH:-12}
+      APP_SEED_ENABLED: ${APP_SEED_ENABLED:-false}
+      APP_SWAGGER_ENABLED: ${APP_SWAGGER_ENABLED:-false}
+      APP_LOGIN_RATE: ${APP_LOGIN_RATE:-30}
+      APP_PUBLIC_RATE: ${APP_PUBLIC_RATE:-180}
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    networks:
+      - sehatflow_internal
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+networks:
+  sehatflow_internal:
+    driver: bridge
+
+volumes:
+  postgres_data:

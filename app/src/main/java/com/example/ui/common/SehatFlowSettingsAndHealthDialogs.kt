@@ -290,7 +290,7 @@ fun SehatFlowSettingsDialog(
                     }
                 }
 
-                // 4. SERVER & OFFLINE DEMO CONFIGURATION
+                // 4. SERVER CONFIGURATION
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -315,25 +315,6 @@ fun SehatFlowSettingsDialog(
                                 .fillMaxWidth()
                                 .testTag("server_url_input")
                         )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Offline Demo Mode", fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
-                                Text(
-                                    "Simulate real-time queue without backend server",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Switch(
-                                checked = demoToggle,
-                                onCheckedChange = { demoToggle = it },
-                                modifier = Modifier.testTag("demo_mode_switch")
-                            )
-                        }
                     }
                 }
 
@@ -353,7 +334,7 @@ fun SehatFlowSettingsDialog(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Version 2.4.0 • Real-time Clinic Token & Queue Platform",
+                            text = "Version ${com.example.BuildConfig.VERSION_NAME} (${com.example.BuildConfig.VERSION_CODE}) • Real-time Clinic Token & Queue Platform",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -368,7 +349,7 @@ fun SehatFlowSettingsDialog(
         },
         confirmButton = {
             Button(
-                onClick = { onSaveServerConfig(urlInput, demoToggle) },
+                onClick = { onSaveServerConfig(urlInput, false) },
                 modifier = Modifier.testTag("save_server_settings_btn")
             ) {
                 Text(stringResource(R.string.save_settings_btn))

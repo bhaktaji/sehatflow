@@ -235,130 +235,18 @@ fun LoginScreen(
                                 uiState.errorMessage?.contains("connect", ignoreCase = true) == true
                             ) {
                                 Spacer(modifier = Modifier.height(10.dp))
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                OutlinedButton(
+                                    onClick = { showServerSettings = true },
+                                    modifier = Modifier.fillMaxWidth()
                                 ) {
-                                    OutlinedButton(
-                                        onClick = { showServerSettings = true },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Settings", style = MaterialTheme.typography.labelSmall)
-                                    }
-                                    Button(
-                                        onClick = {
-                                            viewModel.setDemoMode(true)
-                                            viewModel.clearError()
-                                        },
-                                        modifier = Modifier.weight(1f)
-                                    ) {
-                                        Text("Use Demo Mode", style = MaterialTheme.typography.labelSmall)
-                                    }
+                                    Text("Server Settings", style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
                     }
                 }
 
-                // 2. INSTANT DEMO MODE CARD (Prominent Near Top for Customer Evaluation)
-                Card(
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
-                    ),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.tertiary.copy(alpha = 0.5f)),
-                    shape = RoundedCornerShape(16.dp),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 14.dp)
-                        .testTag("demo_preview_card")
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(14.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Bolt,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.tertiary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Instant Demo Mode",
-                                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
-                            Spacer(modifier = Modifier.weight(1f))
-                            Surface(
-                                shape = RoundedCornerShape(8.dp),
-                                color = MaterialTheme.colorScheme.tertiary.copy(alpha = 0.15f)
-                            ) {
-                                Text(
-                                    text = "No Sign-In Needed",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.SemiBold,
-                                    color = MaterialTheme.colorScheme.tertiary,
-                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
-                                )
-                            }
-                        }
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            text = "Test complete Patient, Doctor, Receptionist, and Clinic Admin workflows instantly:",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            FilledTonalButton(
-                                onClick = { viewModel.loginAsDemo(Role.PATIENT) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("demo_patient_btn"),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                            ) {
-                                Text("Patient", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                            }
-                            FilledTonalButton(
-                                onClick = { viewModel.loginAsDemo(Role.DOCTOR) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("demo_doctor_btn"),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                            ) {
-                                Text("Doctor", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                            }
-                            FilledTonalButton(
-                                onClick = { viewModel.loginAsDemo(Role.RECEPTIONIST) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("demo_reception_btn"),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                            ) {
-                                Text("Desk", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                            }
-                            FilledTonalButton(
-                                onClick = { viewModel.loginAsDemo(Role.OWNER) },
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .testTag("demo_owner_btn"),
-                                contentPadding = PaddingValues(horizontal = 4.dp, vertical = 6.dp)
-                            ) {
-                                Text("Admin", style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
-
-                // 3. PRIMARY SECTION: FOR PATIENTS (Sections 4.1, 4.2, 5, 6, 7)
+                // 2. PRIMARY SECTION: FOR PATIENTS (Sections 4.1, 4.2, 5, 6, 7)
                 Card(
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface
@@ -798,11 +686,11 @@ fun LoginScreen(
                                         staffInviteIsError = !res.isSuccess
                                         staffInviteFeedback = res.message
                                         if (res.isSuccess) {
-                                            when (res.assignedRole) {
-                                                UserRole.DOCTOR -> viewModel.loginAsDemo(Role.DOCTOR)
-                                                UserRole.RECEPTIONIST -> viewModel.loginAsDemo(Role.RECEPTIONIST)
-                                                else -> {}
-                                            }
+                                            viewModel.completeStaffInviteOnboarding(
+                                                assignedRole = res.assignedRole,
+                                                clinicId = res.clinicId,
+                                                actorId = actorId
+                                            )
                                         }
                                     },
                                     modifier = Modifier

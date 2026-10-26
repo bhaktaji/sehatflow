@@ -1,19 +1,51 @@
+# Android & Gradle build outputs
 *.iml
-.gradle
-.kotlin
+.gradle/
+.kotlin/
 /local.properties
+local.properties
+/build/
+app/build/
+/captures/
+.externalNativeBuild/
+.cxx/
+
+# Spring Boot / Maven backend build outputs
+backend/target/
+backend/.mvn/
+
+# Release artifacts & generated binaries
+/release/
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Keystores & private credentials (preserve AI Studio debug keystore seed)
+*.jks
+*.keystore
+!debug.keystore.base64
+
+# Environment variables & local secrets
+.env
+.env.*
+!.env.example
+
+# IDE & OS local state
 /.idea/caches
 /.idea/libraries
 /.idea/modules.xml
 /.idea/workspace.xml
 /.idea/navEditor.xml
 /.idea/assetWizardSettings.xml
+.vscode/
 .DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
-.env
-debug.keystore
+Thumbs.db
+
+# Logs & temporary test artifacts
 *-debug.log
+*.log
+npm-debug.log*
+firestore-debug.log*
+firebase-debug.log*
+ui-debug.log*
