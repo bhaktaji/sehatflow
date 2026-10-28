@@ -53,13 +53,13 @@ public class SubscriptionAndUpdateController {
   @Value("${app.updates.apk-download-url:https://api.sehatflow.app/releases/SehatFlow-1.0-release.apk}")
   private String apkDownloadUrl;
 
-  @Value("${app.updates.apk-sha256:be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867}")
+  @Value("${app.updates.apk-sha256:8cfbff8cb079d87efadcda873182b782ead5850c87fa0e49494ca3906cf79d57}")
   private String apkSha256;
 
-  @Value("${app.updates.apk-size-bytes:22649245}")
+  @Value("${app.updates.apk-size-bytes:22731677}")
   private long apkSizeBytes;
 
-  @Value("${app.updates.signing-cert-sha256:e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd}")
+  @Value("${app.updates.signing-cert-sha256:1123931df3516f4e816e792e1348ba9e4a548c769eb46e71677691f13af88be0}")
   private String signingCertSha256;
 
   private final Set<String> processedWebhookEvents = ConcurrentHashMap.newKeySet();

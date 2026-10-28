@@ -1,236 +1,289 @@
-# SehatFlow — Smart Clinic Queue, Consultation & EMR Platform
+<p align="center">
+  <img src="public/assets/aistudio/SehatFlow_Healthcare_Logo_dfbfe0b9.png" alt="SehatFlow Healthcare Logo" width="180"/>
+</p>
 
-**Tagline:** *Less Waiting. Smarter Care.*  
-**Application ID:** `com.aistudio.clinicqueue.rwnq`  
-**Version:** `1.0` (`versionCode = 1`)  
-**Min / Target / Compile SDK:** `24` (Android 7.0) / `36` / `36`
+# SehatFlow — Smart Outpatient Queue, Consultation & EMR Platform
 
----
+<p align="center">
+  <strong>Less Waiting. Smarter Care.</strong><br/>
+  <em>A modern, mobile-first outpatient clinic queue orchestration, multi-chamber consultation coordination, and longitudinal Electronic Medical Record (EMR) platform for Android.</em>
+</p>
 
-## A. Project Overview
-
-**SehatFlow** is a production-grade, mobile-first outpatient clinic queue management, multi-chamber consultation coordination, and longitudinal Electronic Medical Record (EMR) application for Android.
-
-### What Problem It Solves
-Outpatient clinics and hospitals frequently struggle with crowded waiting rooms, paper token confusion, unpredictable wait times, and disconnected visit histories. SehatFlow replaces manual paper queues with a real-time, role-aware digital workflow connecting **Patients**, **Receptionists**, **Doctors**, and **Clinic Owners**.
-
-### Key Features
-* **Patients:**
-  * Zero-friction **Google Sign-In** (Jetpack `CredentialManager`) and instant live token status lookup.
-  * Real-time queue position tracking, doctor chamber status (`OPEN`, `PAUSED`, `CLOSED`), and dynamic **EWMA** (Exponentially Weighted Moving Average) wait-time estimates.
-  * Longitudinal personal visit & prescription medical history timeline with DPDP 2023 consent controls.
-* **Receptionists:**
-  * Rapid walk-in & phone token registration (`NORMAL`, `PRIORITY`, and `EMERGENCY` triage).
-  * Multi-chamber filtering and one-tap **Assign / Reassign Doctor** routing.
-  * Hold, Resume, Skip, Re-queue, and Cancel controls with full audit logging.
-  * Administrative visit history & medical record copy request tracking (with clinical note redaction).
-* **Doctors:**
-  * Dedicated chamber console (`Call Next`, `Start Consultation`, `Complete`, `Skip`, `Pause/Resume Chamber`).
-  * Longitudinal patient medical timeline (`PatientMedicalHistoryDialog`) across visits and chambers.
-  * Structured SOAP clinical note composer, vital signs (`BP`, `SpO2`, `Pulse`, `Temp`, `Weight`), diagnoses, prescriptions, lab orders, and versioned clinical addenda.
-* **Clinic Owners / Administrators:**
-  * 14-day free trial clinic onboarding wizard & multi-chamber setup.
-  * Cryptographic role-bound staff invitation code generator (`DOC-*`, `REC-*`).
-  * **Server-Verified Razorpay Subscription Billing:** Supports Indian UPI (GPay, PhonePe, Paytm, BHIM VPA/QR), Debit/Credit Cards (RuPay, Visa, Mastercard), NetBanking, and UPI AutoPay e-Mandates across Monthly (`₹499`), Quarterly (`₹1,349`), and Annual (`₹4,999`) plans.
-  * **In-App Subscription Management & In-App Updates** directly inside **Application Settings**.
+<p align="center">
+  <img src="https://img.shields.io/badge/Android-7.0%20to%2016-3DDC84?style=flat&logo=android&logoColor=white" alt="Android 7.0 - 16"/>
+  <img src="https://img.shields.io/badge/Kotlin-2.0.21-7F52FF?style=flat&logo=kotlin&logoColor=white" alt="Kotlin 2.0"/>
+  <img src="https://img.shields.io/badge/Jetpack%20Compose-M3-4285F4?style=flat&logo=jetpackcompose&logoColor=white" alt="Jetpack Compose M3"/>
+  <img src="https://img.shields.io/badge/Tests-66%20Passed%20(100%25)-success?style=flat" alt="Tests Passed"/>
+  <img src="https://img.shields.io/badge/Backend-Spring%20Boot%203.3%20%2B%20PostgreSQL%2016-6DB33F?style=flat&logo=springboot&logoColor=white" alt="Spring Boot"/>
+  <img src="https://img.shields.io/badge/Payments-Direct%20UPI%20%26%20Razorpay-0C2340?style=flat" alt="Payments UPI & Razorpay"/>
+  <img src="https://img.shields.io/badge/Compliance-DPDP%202023%20%7C%20MCI%20Ethics-blue?style=flat" alt="Compliance"/>
+</p>
 
 ---
 
-## B. Public Release (`v1.0`)
+## Executive Summary & Value Proposition
 
-| Release Property | Value |
+In India and emerging healthcare markets, outpatient departments (OPDs) and private clinics face a daily operational bottleneck: **overcrowded waiting rooms, opaque wait times, lost paper tokens, receptionist burnout, and fragmented patient medical records**.
+
+**SehatFlow** solves this with a unified, role-aware digital platform connecting **Patients**, **Receptionists**, **Consulting Doctors**, and **Clinic Owners** in real time:
+
+- **For Patients:** View glanceable live queue tokens from anywhere, track estimated wait times calculated via Exponentially Weighted Moving Averages (EWMA), and maintain an unbroken, longitudinal personal medical timeline with strict privacy controls.
+- **For Receptionists:** Issue walk-in, priority, and emergency tokens in seconds, triage uploaded prescriptions or presenting complaints, assign patients across multi-doctor chambers, and manage queue dynamics with full audit transparency.
+- **For Doctors:** Call next patients with a single tap, review previous visits and prescriptions on a chronological timeline, author structured SOAP clinical notes and vital signs, and issue versioned clinical addenda without disrupting clinic flow.
+- **For Clinic Owners:** Onboard new clinics with a 14-day free trial, configure multi-chamber rosters, generate cryptographic staff invitation codes, monitor operational throughput, and collect subscriptions via **Direct Google Pay / UPI** (zero transaction fees) or **Razorpay Gateway** (Cards, NetBanking, e-Mandates).
+
+---
+
+## 1. Product Architecture & Workflows
+
+### System Architecture Overview
+
+```mermaid
+flowchart TB
+    subgraph ClientLayer["Android Client Tier (com.aistudio.clinicqueue.rwnq)"]
+        UI["Jetpack Compose UI<br/>(Material 3 Dynamic Layouts)"]
+        VM["MVVM StateFlows & ViewModels"]
+        Engine["Core Business Engines<br/>(EtaCalculator, SubscriptionEngine, AppUpdateManager)"]
+        LocalCache[("Room SQLite DB<br/>(Offline Resilient Cache)")]
+        Prefs[("Jetpack DataStore<br/>(Role & Session State)")]
+    end
+
+    subgraph IdentityLayer["Identity & Security Tier"]
+        GSI["Google Identity Services<br/>(Jetpack Credential Manager)"]
+        FirebaseAuth["Firebase Authentication"]
+        Secrets["Secrets Gradle Plugin<br/>(Gitignored .env Injected)"]
+    end
+
+    subgraph CloudLayer["Cloud & Backend Infrastructure"]
+        Firestore[("Cloud Firestore Enterprise<br/>(Real-Time Multi-Tenant Sync)")]
+        SpringAPI["Spring Boot 3.3.5 REST API<br/>(Docker / Cloud Run)"]
+        Postgres[("PostgreSQL 16 Database<br/>(Flyway V1 & V2 Migrations)")]
+    end
+
+    subgraph PaymentsLayer["Dual-Modality Billing Engine"]
+        UPI["Direct Google Pay / UPI<br/>(Dynamic QR, upi://pay, UTR Verification)"]
+        Razorpay["Razorpay Server Gateway<br/>(HMAC-SHA256, Idempotent Webhooks)"]
+    end
+
+    UI --> VM --> Engine
+    Engine <--> LocalCache
+    Engine <--> Prefs
+    VM -->|"OAuth 2.0"| GSI --> FirebaseAuth
+    Secrets -.->|"BuildConfig Injection"| Engine
+    Engine <-->|"WSS / gRPC Sync"| Firestore
+    Engine <-->|"HTTPS REST / JSON"| SpringAPI
+    SpringAPI --> Postgres
+    Engine <--> UPI
+    Engine <--> Razorpay
+```
+
+### End-to-End Clinic Consultation Workflow
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Patient
+    actor Receptionist
+    actor Doctor
+    participant App as SehatFlow App
+    participant Cloud as Cloud Sync & DB
+
+    Patient->>App: Book via Google Sign-In or Walk-in at Clinic Desk
+    Receptionist->>App: Register Patient, Select Chamber, Tap "Issue Token"
+    App->>Cloud: Persist Token (WAITING) with immutable patient snapshot
+    App-->>Patient: Live Token Badge, People Ahead & Dynamic Rolling ETA
+    Receptionist->>App: (Optional) Assign Doctor based on Presenting Complaint
+    Doctor->>App: Tap "Call Next Patient"
+    App->>Cloud: Lock Token (CALLED) & Alert Patient on Mobile
+    Doctor->>App: Tap "Start Consultation" -> Record Vitals, SOAP Notes, Rx
+    Doctor->>App: Tap "Complete Consultation"
+    App->>Cloud: Persist ConsultationRecord (COMPLETED) + Longitudinal Timeline
+    App-->>Patient: Digital Visit Summary & Prescription available in History
+```
+
+---
+
+## 2. Core Capabilities by User Persona
+
+### 👨‍👩‍👧‍👦 Patient Experience
+* **Zero-Friction Authentication:** Instant Google Sign-In via Jetpack `CredentialManager` or quick phone/token code lookup.
+* **Live Glanceable Queue Status:** Displays current token being served, number of patients ahead, and doctor chamber availability (`OPEN`, `PAUSED`, `CLOSED`).
+* **Intelligent EWMA ETA:** Dynamic estimated arrival recommendations calculated using historical consultation durations; pauses during doctor breaks to prevent false expectations.
+* **Optional Prescription Upload:** Android Photo Picker contract (zero storage permissions required) with DPDP Act 2023 consent capture.
+* **Longitudinal Medical History:** Review all past consultations across clinics and chambers with prescribed medications and non-diagnostic health summaries.
+* **DPDP 2023 Consent Management:** Optional self-reported health profile fields with instant consent withdrawal support in Settings.
+
+### 📋 Receptionist Desk
+* **Fast Walk-in Registration:** Token issuance in under 10 seconds for walk-in, phone, or scheduled appointments.
+* **Emergency & Priority Triage:** Escalate critical patients (`EMERGENCY`, `SENIOR_CITIZEN`) to top of queue with mandatory audit logging.
+* **Problem-Based Doctor Assignment:** Intelligently routes unassigned appointments to available chambers based on presenting complaints and remaining daily slot capacity (`booked / 10`).
+* **Multi-Chamber Queue Controls:** Re-order, hold, resume, skip to tail, or mark no-shows with audit trail.
+* **Least-Privilege Privacy:** Receptionists view operational token statuses, schedules, and patient contact numbers; **private doctor SOAP notes and diagnoses are automatically redacted**.
+
+### 🩺 Consulting Doctor Console
+* **Chamber Queue Console:** One-tap `Call Next`, `Start Consultation`, `Complete`, `Skip`, and `Pause Session` (Doctor Break).
+* **Cross-Visit Patient Medical Timeline:** Chronological 2-year clinical history dialog for treated patients, highlighting prior diagnoses, vitals trends, and medication history.
+* **Structured SOAP Clinical Composer:** Record Subjective, Objective, Assessment, and Plan, vital signs (`BP`, `SpO2`, `Pulse`, `Temp`, `Weight`), diagnosis, prescriptions, and lab orders.
+* **Versioned Clinical Addenda:** Completed consultations are write-once and immutable. Post-visit lab findings or clarifications are appended as versioned addenda (`v1 -> v2`) with cryptographic audit logging.
+* **Doctor Privacy Isolation:** Clinical data is fully visible; **patient personal mobile phone numbers are redacted (`null`) to protect patient privacy**.
+
+### 🏥 Clinic Owner & Administrator
+* **14-Day Pro Free Trial:** Zero-risk onboarding wizard with instant multi-chamber and multi-doctor schedule setup.
+* **Cryptographic Staff Invitations:** High-entropy, role-bound invite codes (`DOC-*`, `REC-*`) with single-use binding and rate limiting.
+* **Clinic Operational Analytics:** Real-time visibility into daily patient throughput, average consultation durations, queue wait times, and chamber utilization.
+* **In-App Subscription Management:** Direct management of clinic billing, plan renewals, and official GST invoice records.
+
+---
+
+## 3. Dual-Modality Subscription & Billing Engine
+
+SehatFlow supports two payment modes tailored to Indian medical practices:
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     SEHATFLOW BILLING ENGINE                            │
+├────────────────────────────────────┬────────────────────────────────────┤
+│   MODE A: Direct UPI / Google Pay  │     MODE B: Razorpay PG Gateway    │
+│   (100% Free • Direct to Bank)     │     (Cards • NetBanking • Mandate) │
+├────────────────────────────────────┼────────────────────────────────────┤
+│ • Zero merchant account required   │ • Credit / Debit Cards (RuPay,Visa)│
+│ • Zero gateway transaction fees    │ • NetBanking (HDFC, ICICI, SBI)    │
+│ • Instant settlement to doctor bank│ • UPI AutoPay Recurring e-Mandates │
+│ • Google Pay, PhonePe, Paytm, BHIM │ • Server-side HMAC-SHA256 signature│
+│ • Dynamic 29x29 Vector QR code     │ • Automatic webhook processing     │
+│ • Instant 12-digit UTR activation  │ • Instant refund revocation        │
+└────────────────────────────────────┴────────────────────────────────────┘
+```
+
+### Supported Subscription Plans
+| Plan ID | Plan Name | Price (INR) | Duration | Ideal For |
+| :--- | :--- | :---: | :---: | :--- |
+| `plan_pro_monthly` | **SehatFlow Pro Monthly** | `₹499` | 30 Days | Single-chamber clinics, solo practitioners, seasonal OPDs |
+| `plan_pro_quarterly` | **SehatFlow Pro Quarterly** | `₹1,349` *(Save 10%)* | 90 Days | Growing multi-chamber outpatient centers |
+| `plan_pro_annual` | **SehatFlow Pro Annual** | `₹4,999` *(2 Months Free)* | 365 Days | Established polyclinics, hospital OPDs, compliance archival |
+
+### Security & Privacy Controls
+* **Zero Secrets in Code:** Personal receiving UPI credentials (`SEHATFLOW_UPI_VPA`, `SEHATFLOW_UPI_NAME`, `SEHATFLOW_UPI_NUMBER`) are stored in `/.env` (gitignored), injected at compile-time via `BuildConfig`, and never exposed when pushing to GitHub.
+* **Server-Only Merchant Credentials:** Razorpay secrets (`RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, `RAZORPAY_WEBHOOK_SECRET`) reside exclusively on the backend container and are excluded from the Android APK via `secrets.ignoreList`.
+* **Zero PCI Card Storage:** Raw card numbers (PAN) and CVVs are strictly rejected; only masked instruments (`Card •••• 4242`) are retained.
+* **Early Renewal Stacking:** Renewing an active plan stacks additional duration seamlessly (`currentExpiresAt + plan.durationDays`).
+
+---
+
+## 4. Cryptographic In-App Update Engine
+
+To deliver updates directly to clinics and doctor tablets without requiring Google Play Store dependencies:
+
+* **Official HTTPS Manifest (`GET /api/v1/releases/latest`):** Backed by [`release/version-manifest.json`](release/version-manifest.json).
+* **Pre-Install Cryptographic Verification:**
+  1. Computes the SHA-256 digest of the downloaded APK and validates against `manifest.sha256Checksum` (auto-purges corrupted downloads).
+  2. Verifies that the APK signing certificate matches `signingCertSha256 = e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd`.
+  3. Enforces version incrementing (`latestVersionCode > installedVersionCode`) to block malicious downgrades.
+* **In-Place Seamless Upgrade:** Preserves all local Room databases, patient records, and login sessions across updates via Android's secure `FileProvider`.
+
+---
+
+## 5. Commercial Potential & Investor Overview
+
+### The Market Opportunity
+- **Target Customer Segment:** 250,000+ private outpatient clinics, polyclinics, and nursing homes across Tier 1, 2, and 3 Indian cities.
+- **The Problem:** The average Indian OPD patient spends **75 to 120 minutes waiting** for a **5 to 8 minute consultation**, causing waiting room chaos, patient dissatisfaction, and receptionist turnover.
+- **The Solution:** A mobile-first queue orchestration platform that requires **zero dedicated hardware** (runs on existing staff phones and tablets) and enables patients to wait remotely.
+
+### Business & Revenue Model
+- **B2B SaaS Pricing:** Flat-rate recurring subscription (₹499/month or ₹4,999/year per clinic) offering predictable, recurring SaaS revenue with zero per-token transaction friction.
+- **Low Customer Acquisition Cost (CAC):** Viral clinic-to-patient adoption: every patient who checks their queue token experiences the product and introduces it to their own doctors and family clinics.
+- **High Retention & Switching Costs:** Once a clinic migrates its staff roster, multi-chamber routing, and longitudinal patient medical history to SehatFlow, retention is protected by clinical workflow integration.
+
+### Product Maturity & Roadmap Differentiation
+- **Current Maturity (v1.0):** Production-grade Android application with 66 passing automated tests, dual-modality payments, zero-trust security rules, and full offline resilience.
+- **Future Expansion Priorities (Roadmap):**
+  - **ABDM Integration (M1/M2/M3):** Ayushman Bharat Digital Mission compliance for ABHA creation and health locker interoperability.
+  - **WhatsApp Business API Notifications:** Automated 10-minute turn reminders sent directly to patient WhatsApp numbers.
+  - **Multi-Clinic Practice Chains:** Multi-tenant enterprise dashboard for hospital networks managing 20+ clinic branches.
+
+---
+
+## 6. Public Release Artifact (`v1.0`)
+
+| Release Property | Verified Value |
 | :--- | :--- |
-| **App Name** | SehatFlow |
-| **Package Identifier** | `com.aistudio.clinicqueue.rwnq` |
+| **App Name** | **SehatFlow** |
+| **Application ID** | `com.aistudio.clinicqueue.rwnq` |
 | **Version Name / Code** | `1.0` (`1`) |
-| **Signed Release Artifact** | [`release/SehatFlow-1.0-release.apk`](release/SehatFlow-1.0-release.apk) |
+| **Release Artifact** | [`release/SehatFlow-1.0-release.apk`](release/SehatFlow-1.0-release.apk) |
 | **Version Manifest** | [`release/version-manifest.json`](release/version-manifest.json) |
-| **Artifact Size** | `22,649,245 bytes` (~21.60 MB) |
-| **SHA-256 Checksum** | `be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867` |
-| **Signing Certificate SHA-256** | `e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd` |
-| **Signature Schemes** | APK Signature Scheme v2 Verified (`apksigner verify`) |
-| **Supported Android Versions** | Android 7.0 Nougat (`API 24`) through Android 16 (`API 36`) |
+| **Binary Size** | `22,731,677 bytes` (~21.68 MB) |
+| **SHA-256 Digest** | `8cfbff8cb079d87efadcda873182b782ead5850c87fa0e49494ca3906cf79d57` |
+| **Signing Certificate SHA-256** | `1123931df3516f4e816e792e1348ba9e4a548c769eb46e71677691f13af88be0` |
+| **Signature Verification** | APK Signature Scheme v2 Verified (`apksigner verify`) |
+| **Minimum / Target SDK** | Android 7.0 Nougat (`API 24`) / Android 16 (`API 36`) |
 
-### Verifying the Release APK Checksum
 ```bash
+# Verify the release artifact integrity
 sha256sum release/SehatFlow-1.0-release.apk
 # Expected output:
-# be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867  release/SehatFlow-1.0-release.apk
+# 8cfbff8cb079d87efadcda873182b782ead5850c87fa0e49494ca3906cf79d57  release/SehatFlow-1.0-release.apk
 ```
 
 ---
 
-## C. Subscription & Payment Gateway Architecture (Razorpay)
+## 7. Developer Quick Start
 
-### 1. Supported Plans & Pricing
-| Plan ID | Plan Name | Price (INR) | Duration | Highlights |
-| :--- | :--- | :---: | :---: | :--- |
-| `plan_pro_monthly` | **SehatFlow Pro Monthly** | `₹499` (`49900` paise) | `30 Days` | Flat rate per clinic; unlimited OPD tokens & multi-doctor chambers. |
-| `plan_pro_quarterly` | **SehatFlow Pro Quarterly** | `₹1,349` (`134900` paise) | `90 Days` | Save 10% (`₹148` off); ideal for multi-chamber group practices. |
-| `plan_pro_annual` | **SehatFlow Pro Annual** | `₹4,999` (`499900` paise) | `365 Days` | 2 Months Free (Save `₹989`); includes annual compliance archive export. |
+### Prerequisites
+- **JDK 17+** (JDK 21 recommended)
+- **Android SDK** (API 24 to 36, pre-configured in container)
+- **Gradle 8.9+** (executed via `gradle`)
+- **Docker & Docker Compose** (for backend PostgreSQL testing)
 
-### 2. Server-Side Payment Verification & Security Lifecycle
-1. **No Secrets in APK:** `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` reside **exclusively on the backend** (`.env` / `application-prod.yml`) and are excluded from the Android APK via `secrets.ignoreList` in `app/build.gradle.kts`.
-2. **Order Creation (`POST /api/v1/subscriptions/orders`):** Generates a server-side order (`order_sf_*`) scoped to `clinicId`, `planId`, and an `idempotencyKey`. Duplicate requests with the same `idempotencyKey` return the existing pending order or reject if already captured.
-3. **HMAC-SHA256 Payment Verification (`POST /api/v1/subscriptions/verify`):**
-   * Computes `HMAC_SHA256(orderId + "|" + gatewayPaymentId, RAZORPAY_KEY_SECRET)` using constant-time comparison.
-   * **Subscriptions are NEVER activated from client UI state alone**—activation occurs strictly after signature verification or a verified signed webhook.
-   * **Early Renewal Stacking:** Renewing an active subscription extends from the current `expiresAt` timestamp (`currentExpiresAt + plan.durationDays`).
-   * **Zero PCI Card Storage:** Raw 12–19 digit card numbers (PAN) and CVV codes are strictly rejected by `validateAndSanitizeInstrument`; only masked references (`Card •••• 4242` or `clinic@okhdfcbank`) and transaction IDs are stored.
-4. **Signed Webhook Processing (`POST /api/v1/webhooks/razorpay`):**
-   * Verifies `X-Razorpay-Signature` (`HMAC_SHA256(rawPayload, RAZORPAY_WEBHOOK_SECRET)`) and enforces idempotency via `X-Razorpay-Event-Id`.
-   * Handles:
-     * `payment.authorized` → Marks transaction `PENDING` (does not activate plan prematurely).
-     * `payment.captured` / `subscription.charged` → Marks transaction `CAPTURED` and activates/extends subscription (`ACTIVE`).
-     * `payment.failed` → Marks transaction `FAILED` with issuer error reason.
-     * `refund.processed` / `payment.refunded` → Marks transaction `REFUNDED` and **immediately revokes** the clinic's subscription (`REVOKED_REFUNDED`) to prevent unauthorized access after a refund.
-     * `subscription.cancelled` → Disables `autoRenew` and transitions to `CANCELLED_AT_PERIOD_END` (retaining paid access until `expiresAt`, then transitioning to `EXPIRED`).
-5. **Backend Entitlement Enforcement:**
-   * Enforced at the service/backend layer (`SubscriptionPaymentEngine.enforceEntitlementOrThrow` & Spring Boot `SubscriptionAndUpdateController`), blocking new token issuance when a clinic's trial or subscription is `EXPIRED` or `REVOKED_REFUNDED` while preserving read-only access to historical clinical records.
-
-### 3. Merchant Account & Settlement Setup (Manual Operator Steps)
-To receive live customer payments directly into your bank account:
-1. **Complete Razorpay Merchant KYC & Bank Verification:**
-   * Sign in to [https://dashboard.razorpay.com](https://dashboard.razorpay.com) and complete business KYC, GSTIN verification, and settlement bank account penny-drop verification under **Account & Settings → Bank Accounts and Settlements**.
-2. **Generate Live API Credentials:**
-   * Navigate to **Account & Settings → API Keys → Generate Live Key**.
-   * Copy the `Key ID` (`rzp_live_...`) and `Key Secret` into your backend server's `.env` file (`RAZORPAY_KEY_ID` and `RAZORPAY_KEY_SECRET`).
-3. **Configure Signed Webhooks:**
-   * Navigate to **Account & Settings → Webhooks → + Add New Webhook**.
-   * **Webhook URL:** `https://api.sehatflow.app/api/v1/webhooks/razorpay`
-   * **Secret:** Set a strong secret and copy it to `RAZORPAY_WEBHOOK_SECRET` in your backend `.env`.
-   * **Active Events:** Enable `payment.authorized`, `payment.captured`, `payment.failed`, `refund.processed`, `subscription.charged`, and `subscription.cancelled`.
-
----
-
-## D. In-App App Updates (`Settings → Check for Updates`)
-
-### 1. How the In-App Update Flow Works
-* **Trusted HTTPS Manifest:** Queries `GET https://api.sehatflow.app/api/v1/releases/latest` (backed by [`release/version-manifest.json`](release/version-manifest.json)).
-* **Official Source Validation:** `AppUpdateManager.isTrustedOfficialReleaseUrl` rejects cleartext `http://` and untrusted third-party domains.
-* **Optional vs. Mandatory Updates:**
-  * If `installedVersionCode < minRequiredVersionCode` or `isMandatoryCriticalRelease == true`, the update is marked **MANDATORY**.
-  * If `installedVersionCode < latestVersionCode`, the update is presented as **OPTIONAL** with full release notes and an **Update Now** button.
-  * If `installedVersionCode >= latestVersionCode`, displays a clear confirmation that the app is up to date.
-* **Pre-Install Cryptographic & Signature Verification:**
-  1. Streams the APK to `<cacheDir>/updates/` with live progress (`0%..100%`) and **Retry Download** support on network interruption.
-  2. Computes the file's **SHA-256 checksum** and verifies it matches `manifest.sha256Checksum` (automatically deleting the file on mismatch).
-  3. Verifies the package name (`com.aistudio.clinicqueue.rwnq`), blocks version downgrades (`latestVersionCode > installedVersionCode`), and verifies `signingCertSha256` compatibility so Android upgrades in place while **preserving all existing user data, Room databases, and login sessions**.
-  4. Launches the Android Package Installer via `androidx.core.content.FileProvider` (`content://com.aistudio.clinicqueue.rwnq.fileprovider/...`).
-
-### 2. Publishing a New App Update (`v1.1+`)
-1. Increment `versionCode` (e.g., `2`) and `versionName` (e.g., `"1.1"`) in `app/build.gradle.kts`.
-2. Build and sign the release APK using the **exact same release keystore** (`signingCertSha256 = e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd`) so existing users can upgrade without uninstalling.
-3. Compute the new APK's byte size and SHA-256 checksum:
-   ```bash
-   sha256sum release/SehatFlow-1.1-release.apk
-   stat -c%s release/SehatFlow-1.1-release.apk
-   ```
-4. Update `release/version-manifest.json` and the `APP_UPDATE_*` variables in `.env` on the backend server.
-
----
-
-## E. Architecture Documentation
-
-* **[High-Level Design (`HLD.md`)](HLD.md):** System context, multi-role persona matrix, hybrid Cloud Firestore + Spring Boot REST + Room architecture, deployment topology, and security/compliance model.
-* **[Low-Level Design (`LLD.md`)](LLD.md):** Module/package breakdown, Jetpack Compose navigation & RBAC guards, REST API endpoint specifications, PostgreSQL Flyway ER diagram (`V1` & `V2`), Firestore collection schema, and sequence diagrams.
-
----
-
-## F. Getting Started (Developer Setup)
+### Step-by-Step Setup
 
 ```bash
-# 1. Copy environment template
-cp .env.example .env
+# 1. Clone repository
+git clone https://github.com/your-org/sehatflow.git
+cd sehatflow
 
-# 2. Run Android unit, Robolectric, UAT, Subscription, Update & Security tests
+# 2. Configure local environment variables
+cp .env.example .env
+# (Optional: customize SEHATFLOW_UPI_* or RAZORPAY_* secrets in .env)
+
+# 3. Run automated unit, Robolectric, and regression test suites (66 tests)
 gradle :app:testDebugUnitTest
 
-# 3. Start PostgreSQL 16 & Spring Boot backend via Docker Compose
+# 4. Compile the Android application
+gradle :app:assembleDebug
+
+# 5. (Optional) Launch Spring Boot REST backend & PostgreSQL 16
 docker compose up --build -d
+
+# 6. Verify backend health
+curl -s http://localhost:8080/actuator/health | jq .
 ```
 
 ---
 
-## G. Environment Variables
+## 8. Documentation Index
 
-All environment variables are documented in [`.env.example`](.env.example).
-
-| Variable | Component | Configured Value | Description |
-| :--- | :--- | :--- | :--- |
-| `SPRING_PROFILES_ACTIVE` | Backend | `prod` | Activates hardened `application-prod.yml` profile. |
-| `SERVER_PORT` | Backend | `8080` | HTTP listen port inside the backend container. |
-| `APP_SESSION_TIMEOUT` | Backend | `12h` | 12-hour clinic shift session lifetime so staff are not logged out mid-OPD. |
-| `POSTGRES_DB` | PostgreSQL | `sehatflow_clinic_prod` | Production PostgreSQL database name. |
-| `POSTGRES_USER` / `APP_DB_USER` | Backend & DB | `sehatflow_db_admin` | Non-default PostgreSQL database administrator username. |
-| `POSTGRES_PASSWORD` / `APP_DB_PASSWORD` | Backend & DB | *(32-char high-entropy secret)* | Cryptographic password authenticating `sehatflow-backend` to `sehatflow-postgres`. |
-| `APP_DB_URL` | Backend | `jdbc:postgresql://postgres:5432/sehatflow_clinic_prod` | Internal Docker bridge JDBC connection string. |
-| `APP_DB_POOL_MAX` / `APP_DB_POOL_MIN` | Backend | `20` / `5` | HikariCP connection pool sizing for multi-chamber clinic concurrency. |
-| `APP_COOKIE_SECURE` | Backend | `true` | Marks `JSESSIONID` cookie as `Secure` (HTTPS only). |
-| `APP_COOKIE_SAME_SITE` | Backend | `Lax` | Prevents CSRF alongside `XSRF-TOKEN` while preserving mobile network stability. |
-| `APP_BCRYPT_STRENGTH` | Backend | `12` | BCrypt work factor for staff password hashing (~250ms). |
-| `APP_SEED_ENABLED` | Backend | `false` | Disables demo clinic/staff credential seeding in production. |
-| `APP_SWAGGER_ENABLED` | Backend | `false` | Disables public OpenAPI / Swagger UI exposure in production. |
-| `APP_LOGIN_RATE` / `APP_PUBLIC_RATE` | Backend | `30` / `180` | Requests/min per shared clinic Wi-Fi IP for login and public token polling. |
-| `RAZORPAY_KEY_ID` | Backend Only | `rzp_live_...` | Razorpay merchant Key ID (never embedded in APK). |
-| `RAZORPAY_KEY_SECRET` | Backend Only | `rzp_secret_...` | Server-only secret for HMAC-SHA256 payment verification. |
-| `RAZORPAY_WEBHOOK_SECRET` | Backend Only | `whsec_...` | Server-only secret for verifying `X-Razorpay-Signature` webhooks. |
-| `APP_UPDATE_LATEST_VERSION_CODE` | Backend | `1` | Latest published Android `versionCode` served by `/api/v1/releases/latest`. |
-| `APP_UPDATE_APK_URL` | Backend | `https://api.sehatflow.app/releases/SehatFlow-1.0-release.apk` | Official HTTPS download URL for the signed release APK. |
-| `APP_UPDATE_APK_SHA256` | Backend | `be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867` | Trusted SHA-256 digest verified before APK installation. |
+| Topic | Document Link | Description |
+| :--- | :--- | :--- |
+| **System Architecture** | [`HLD.md`](HLD.md) | High-Level Design: topology, multi-role matrix, hybrid sync, billing |
+| **Detailed Implementation** | [`LLD.md`](LLD.md) | Low-Level Design: package structure, Flyway V2, sequence diagrams |
+| **Consultation & Snapshots** | [`docs/CONSULTATION_HISTORY_DESIGN.md`](docs/CONSULTATION_HISTORY_DESIGN.md) | Clinical vs appointment domain separation, point-in-time snapshots |
+| **Privacy & DPDP Policy** | [`docs/DATA_RETENTION_AND_PRIVACY_POLICY.md`](docs/DATA_RETENTION_AND_PRIVACY_POLICY.md) | Indian DPDP Act 2023, patient rights, consent withdrawal rules |
+| **Data Archival Governance** | [`docs/DATA_RETENTION_AND_ARCHIVAL_POLICY.md`](docs/DATA_RETENTION_AND_ARCHIVAL_POLICY.md) | 3-tier non-destructive storage (90d active, 3yr archive, 7yr legal) |
+| **Data Access Matrix (RBAC)** | [`docs/PATIENT_DATA_ACCESS_MATRIX.md`](docs/PATIENT_DATA_ACCESS_MATRIX.md) | Field-level redaction rules across Doctor, Receptionist, Admin |
+| **Patient ID Architecture** | [`docs/PATIENT_ID_AND_MEDICAL_HISTORY.md`](docs/PATIENT_ID_AND_MEDICAL_HISTORY.md) | Non-PII `PAT-XXXX`, shared-phone ambiguity protection |
+| **Feature Surface Inventory** | [`uat/FEATURE_INVENTORY.md`](uat/FEATURE_INVENTORY.md) | Complete list of all implemented features and route mappings |
+| **Automated Test Results** | [`uat/REGRESSION_RESULTS.md`](uat/REGRESSION_RESULTS.md) | Test breakdown for all 66 test cases across 11 test suites |
+| **Production Readiness** | [`uat/PRODUCTION_READINESS_REPORT.md`](uat/PRODUCTION_READINESS_REPORT.md) | Pre-production deployment checklist and hardening verification |
+| **Documentation Audit** | [`uat/DOCUMENTATION_AUDIT_REPORT.md`](uat/DOCUMENTATION_AUDIT_REPORT.md) | Complete documentation inventory, verification, and claim audit |
+| **Technical Verification** | [`uat/VERIFICATION_REPORT.md`](uat/VERIFICATION_REPORT.md) | Link validation, asset checks, test logs, and security audit |
 
 ---
 
-## H. User Handover Guide
+## 9. Contact & Support
 
-### 1. Getting the App
-* **Direct Download:** Obtain `SehatFlow-1.0-release.apk` from `/release/` or your organization's official release page.
-* **Verify Download Integrity:**
-  * **File Size:** `22,649,245 bytes` (~21.60 MB)
-  * **SHA-256:** `be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867`
-* **Installation Steps on Android (Android 7.0+):**
-  1. Download `SehatFlow-1.0-release.apk` onto your Android phone or clinic tablet.
-  2. Tap the `.apk` file and allow installation from your browser/Files app if prompted.
-  3. Open **SehatFlow** from your home screen.
-
-### 2. First-Time Setup
-* **Clinic Owners:** Tap **Start 14-Day Free Trial** on the Welcome screen, sign in with Google, complete the Clinic Onboarding Wizard, and share the generated **Doctor (`DOC-*`)** and **Receptionist (`REC-*`)** invite codes with your staff.
-* **Clinic Staff:** Enter your **Staff Invitation Code** under **For Clinic Staff** and tap **Verify & Join Clinic**, or tap **Staff Sign In**.
-* **Patients:** Tap **Continue with Google** at the top of the Welcome screen.
-
-### 3. Managing Subscriptions & In-App Updates
-* **In-App Subscription Management (`Settings → Subscription & Billing` or `Admin Hub → Subscription`):**
-  * View your current plan, active status, renewal/expiry date, and auto-renewal status.
-  * Select **Monthly (`₹499`)**, **Quarterly (`₹1,349`)**, or **Annual (`₹4,999`)** and pay via UPI, Card, or NetBanking.
-  * Review your GST invoices and payment transaction statuses (`CAPTURED`, `PENDING`, `FAILED`, `REFUNDED`).
-  * Toggle **Auto-Renewal** or tap **Cancel Plan** at any time (your clinic retains access until the current billing period expires).
-* **Checking for App Updates (`Settings → Check for Updates`):**
-  * Open **Settings (gear icon)** and tap **Check for Updates**.
-  * If a newer version is available, review the release notes and tap **Update Now**. SehatFlow downloads the update over HTTPS, verifies its SHA-256 checksum and signing certificate, and launches the Android system installer while preserving your login session and data.
-
-### 4. Roles and Permissions
-
-| Capability | Patient | Receptionist | Doctor | Clinic Owner / Admin |
-| :--- | :---: | :---: | :---: | :---: |
-| Track own live token & ETA | Yes | — | — | — |
-| View own visit & prescription history | Yes | — | — | — |
-| Issue walk-in / priority / emergency tokens | — | Yes | — | Yes |
-| Assign / reassign doctor chamber | — | Yes | — | Yes |
-| View & author full SOAP clinical notes & diagnoses | — | **No (Redacted)** | **Yes** | **No (Redacted)** |
-| Manage clinic subscription, billing & staff invite codes | — | — | — | Yes |
-| Check for app updates in Settings | Yes | Yes | Yes | Yes |
-
-### 5. Data and Privacy
-* **DPDP Act 2023 Compliance:** Patient self-reported health profile fields are optional and can be withdrawn at any time in **Settings → Withdraw Health Consent**.
-* **Zero PCI Card Storage:** Payment instrument inputs never store full card numbers or CVV codes; merchant secrets reside strictly on the backend.
-* **Device Backup Protection:** `backup_rules.xml` and `data_extraction_rules.xml` exclude local clinical databases and session stores from unencrypted cloud backups.
-
-### 6. Troubleshooting
-* **Subscription Expired Banner:** Renew your clinic plan in **Settings → Subscription & Billing** to resume issuing new OPD tokens. Historical medical records remain accessible at all times.
-* **Update Verification Failed:** If an APK download is interrupted on unstable Wi-Fi, tap **Retry Download** in **Settings → Check for Updates**.
-
-### 7. Updates, Support, Admin Handover & Release Info
-* **Updates:** Always sign future releases with the same release certificate (`SHA-256: e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd`) so in-app updates preserve local data.
-* **Support & Grievance Officer:** `privacy-grievance@sehatflow.app` • Helpline: `1800-120-SEHAT`
-* **Admin Handover:** Rotate database and Razorpay secrets via `.env` and restart `docker compose up -d`; monitor health via `GET /actuator/health`.
-* **Release Tag:** `v1.0.0` (`release/SehatFlow-1.0-release.apk`)
+- **Product Inquiries & Demonstrations:** `aakash.bhkta32@gmail.com`
+- **Privacy & Grievance Officer:** `privacy-grievance@sehatflow.app`
+- **Helpline:** `1800-120-SEHAT` (1800-120-73428)
+- **License:** Proprietary Healthcare Software — All Rights Reserved © 2026 SehatFlow.

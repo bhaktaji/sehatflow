@@ -82,6 +82,6 @@ app:
     latest-version-name: ${APP_UPDATE_LATEST_VERSION_NAME:1.0}
     min-required-version-code: ${APP_UPDATE_MIN_REQUIRED_VERSION_CODE:1}
     apk-download-url: ${APP_UPDATE_APK_URL:https://api.sehatflow.app/releases/SehatFlow-1.0-release.apk}
-    apk-sha256: ${APP_UPDATE_APK_SHA256:be2feaa7be5173a514680ca86896dde2e403ee081a8bcf93fc4980ea9d9b1867}
-    apk-size-bytes: ${APP_UPDATE_APK_SIZE_BYTES:22649245}
-    signing-cert-sha256: ${APP_UPDATE_SIGNING_CERT_SHA256:e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd}
+    apk-sha256: ${APP_UPDATE_APK_SHA256:8cfbff8cb079d87efadcda873182b782ead5850c87fa0e49494ca3906cf79d57}
+    apk-size-bytes: ${APP_UPDATE_APK_SIZE_BYTES:22731677}
+    signing-cert-sha256: ${APP_UPDATE_SIGNING_CERT_SHA256:1123931df3516f4e816e792e1348ba9e4a548c769eb46e71677691f13af88be0}

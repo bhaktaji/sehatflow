@@ -21,26 +21,30 @@
 │       │   ├── java/com/example/
 │       │   │   ├── MainActivity.kt           # Edge-to-edge Activity host & theme state observer
 │       │   │   ├── ClinicApplication.kt      # Application singleton & AppContainer DI graph
-│       │   │   ├── core/common/              # Constants, RoleGuard, EtaCalculator, AppContainer
+│       │   │   ├── core/
+│       │   │   │   ├── common/               # Constants, RoleGuard, EtaCalculator, AppContainer
+│       │   │   │   ├── payment/              # SubscriptionPaymentEngine (Direct UPI, QR, UTR, Razorpay)
+│       │   │   │   └── update/               # AppUpdateManager (HTTPS manifest, SHA-256 digest, APK cert check)
 │       │   │   ├── data/
 │       │   │   │   ├── auth/                 # GoogleSignInHelper (Jetpack Credential Manager)
 │       │   │   │   ├── firestore/            # FirestoreClinicSyncRepository (Real-time cloud sync)
 │       │   │   │   ├── local/                # Room AppDatabase, Entities, DAOs, LocalClinicEngine, DataStore
 │       │   │   │   ├── model/                # Domain models, Moshi DTOs, EMR/Consultation models
 │       │   │   │   ├── remote/               # ClinicApiService (Retrofit), DynamicBaseUrlInterceptor, CookieJar
-│       │   │   │   └── repository/           # AuthRepository, QueueRepository
+│       │   │   │   └── repository/           # AuthRepository, QueueRepository, ConsultationHistoryRepository
 │       │   │   └── ui/
 │       │   │       ├── auth/                 # LoginScreen, AuthViewModel
-│       │   │       ├── common/               # SehatFlowSettingsDialog, HealthProfileDialog, Shared UI
-│       │   │       ├── doctor/               # DoctorConsoleScreen, DoctorViewModel, ConsultationSheet
+│       │   │       ├── common/               # SehatFlowSettingsAndHealthDialogs, Shared UI
+│       │   │       ├── doctor/               # DoctorDashboardScreen, DoctorViewModel, ConsultationSheet
 │       │   │       ├── medical/              # PatientMedicalHistoryDialog, ClinicalTimelineComponents
-│       │   │       ├── navigation/           # ClinicNavHost, NavRoutes
-│       │   │       ├── owner/                # OwnerOverviewScreen, OwnerViewModel, OnboardingWizard
-│       │   │       ├── patient/              # PatientStatusScreen, PatientViewModel
+│       │   │       ├── navigation/           # AppNavHost, NavRoute
+│       │   │       ├── owner/                # ClinicAdminDashboardScreen, OwnerViewModel, OnboardingWizard
+│       │   │       ├── patient/              # ClinicSelectScreen, PatientLiveQueueScreen, VisitHistoryScreen
 │       │   │       ├── receptionist/         # ReceptionDashboardScreen, ReceptionViewModel
+│       │   │       ├── subscription/         # ClinicSubscriptionScreen (Direct UPI, GPay, QR, UTR, Plans)
 │       │   │       └── theme/                # Theme.kt, Color.kt, Type.kt
 │       │   └── res/                          # Vector drawables, adaptive icons, strings.xml, backup rules
-│       └── test/java/com/example/            # JUnit 4 + Robolectric UAT, EMR, ETA, and Security test suites
+│       └── test/java/com/example/            # 66 JUnit 4 + Robolectric UAT, Subscription, Update, Security tests
 ├── backend/                                  # Spring Boot 3.3.5 REST API (Java 21 + PostgreSQL 16 + Flyway)
 │   ├── Dockerfile                            # Multi-stage Maven + Eclipse Temurin 21 JRE Alpine container
 │   ├── pom.xml                               # Maven dependencies (Web, Security, Data JPA, Flyway, Actuator)
@@ -51,6 +55,7 @@
 │       │   ├── config/                       # SecurityConfig, RateLimitFilter, CsrfCookieFilter, SeedDataRunner
 │       │   ├── controller/                   # AuthController, ReceptionQueueController, DoctorSessionController,
 │       │   │                                 # PublicTokenController, OwnerController
+│       │   ├── subscription/                 # SubscriptionAndUpdateController (Razorpay verify, webhooks, releases)
 │       │   ├── domain/                       # JPA Entities (Clinic, StaffUser, Doctor, QueueSession, QueueToken, TokenEvent)
 │       │   ├── dto/                          # Request/Response Records with Jakarta Validation
 │       │   ├── repository/                   # Spring Data JPA Repositories
@@ -59,9 +64,11 @@
 │           ├── application.yml               # Default/development configuration
 │           ├── application-prod.yml          # Hardened production profile configuration
 │           └── db/migration/
-│               └── V1__init_schema.sql       # Flyway relational schema & partial indexes
+│               ├── V1__init_schema.sql       # Flyway relational schema & partial indexes
+│               └── V2__subscriptions_and_app_updates.sql # Subscriptions, payments, webhooks & releases
 ├── release/
-│   └── SehatFlow-1.0-release.apk             # Signed, R8-minified public release APK
+│   ├── SehatFlow-1.0-release.apk             # Signed, R8-minified public release APK
+│   └── version-manifest.json                 # Cryptographic update manifest (SHA-256, cert hash, size)
 ├── .github/workflows/ci.yml                  # Automated GitHub Actions CI pipeline
 ├── docker-compose.yml                        # Production multi-container orchestration (PostgreSQL 16 + Backend)
 ├── firestore.rules                           # Zero-trust Cloud Firestore security rules
@@ -286,3 +293,65 @@ sequenceDiagram
     DocUI->>Repo: completeConsultationWithMedicalRecord(...)
     Repo->>DB: Transition token -> COMPLETED & persist longitudinal VisitMedicalRecord
 ```
+
+### 5.3 Dual-Modality Subscription Flow (Direct UPI / GPay & Razorpay PG)
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Owner as Clinic Owner
+    participant SubUI as ClinicSubscriptionScreen
+    participant Engine as SubscriptionPaymentEngine
+    participant UPIApp as Google Pay / PhonePe / Paytm
+    participant API as Spring Boot API (/api/v1/subscriptions)
+    participant PG as PostgreSQL / Firestore
+
+    alt Direct Google Pay / UPI Mode (Zero Merchant Setup)
+        Owner->>SubUI: Select Plan (₹499/mo, ₹1349/3mo, ₹4999/yr) -> Tap "Google Pay"
+        SubUI->>Engine: buildUpiUri(amountInr, note, txnRef)
+        Engine-->>SubUI: upi://pay?pa=...&pn=...&am=499.00&cu=INR&tn=SehatFlow
+        SubUI->>UPIApp: Launch ActionView Intent with package com.google.android.apps.nbu.paisa.user
+        UPIApp-->>SubUI: ActivityResult (Status=SUCCESS, txnRef, responseCode)
+        SubUI->>Engine: recordUpiPaymentActivation(planId, utrNumber, txnRef)
+        Engine->>PG: Transition subscription -> ACTIVE & stack renewal duration
+        Engine-->>SubUI: Success confirmation & GST receipt
+    else Server-Verified Razorpay Gateway Mode
+        Owner->>SubUI: Select Plan -> Tap "Pay via Card / NetBanking"
+        SubUI->>API: POST /api/v1/subscriptions/orders (planId, idempotencyKey)
+        API-->>SubUI: OrderResponse (order_sf_*, amountPaise, keyId)
+        SubUI->>Owner: Open Razorpay Checkout Sheet
+        Owner->>SubUI: Authorize payment with Card / NetBanking
+        SubUI->>API: POST /api/v1/subscriptions/verify (orderId, paymentId, signature)
+        API->>API: Verify constant-time HMAC_SHA256(orderId|paymentId, KEY_SECRET)
+        API->>PG: Record payment_transaction (CAPTURED) & update clinic_subscriptions
+        API-->>SubUI: VerificationResponse (status=ACTIVE, stacked expiresAt)
+    end
+```
+
+### 5.4 Cryptographic In-App Update Verification Sequence
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Clinic Staff / Doctor
+    participant Settings as SehatFlowSettingsDialog
+    participant UpdateMgr as AppUpdateManager
+    participant API as Spring Boot API (/api/v1/releases/latest)
+    participant Installer as Android Package Installer (FileProvider)
+
+    User->>Settings: Tap "Check for Updates"
+    Settings->>UpdateMgr: checkForUpdates(installedVersionCode=1)
+    UpdateMgr->>API: GET /api/v1/releases/latest
+    API-->>UpdateMgr: UpdateManifest (versionCode, apkUrl, sha256Checksum, signingCertSha256)
+    UpdateMgr-->>Settings: UpdateUiState.UpdateAvailable (optional or mandatory)
+    User->>Settings: Tap "Update Now"
+    Settings->>UpdateMgr: downloadAndVerifyUpdate(manifest, progressCallback)
+    UpdateMgr->>UpdateMgr: Stream APK to cacheDir/updates/ with progress (0%..100%)
+    UpdateMgr->>UpdateMgr: Compute SHA-256 digest of downloaded file
+    UpdateMgr->>UpdateMgr: Assert computed SHA-256 == manifest.sha256Checksum
+    UpdateMgr->>UpdateMgr: Verify APK package name & signing certificate SHA-256 match
+    UpdateMgr-->>Settings: UpdateUiState.ReadyToInstall(apkFile)
+    Settings->>Installer: Launch ACTION_VIEW Intent with content://...fileprovider/
+    Installer->>User: Display system "Install Update" prompt (in-place upgrade preserving data)
+```
+

@@ -197,3 +197,40 @@ flowchart TB
 * **EWMA Wait-Time Estimation (`EtaCalculator`):** Dynamically adapts estimated wait times using an Exponentially Weighted Moving Average of actual consultation durations per doctor chamber, bounded by realistic clinical floors and ceilings.
 * **Idempotent Token Issuance:** Client-generated `clientRequestId` keys prevent duplicate tokens when receptionists tap "Issue Token" on unstable clinic Wi-Fi/cellular connections.
 * **Health Probes:** Spring Boot Actuator exposes `/actuator/health`, `/actuator/health/liveness`, and `/actuator/health/readiness` for container orchestrator health checks and zero-downtime rolling deployments.
+
+---
+
+## 8. Clinic Subscription & Dual Payment Architecture
+
+SehatFlow features a dual-modality subscription engine designed for the Indian healthcare ecosystem:
+
+### 8.1 Dual Payment Modalities
+1. **Direct Google Pay & UPI Settlement (Zero Merchant Fees, Direct-to-Bank):**
+   - **Direct UPI Intent (`upi://pay`):** Launches Google Pay (`com.google.android.apps.nbu.paisa.user`), PhonePe, Paytm, or BHIM with verified parameters: `pa`, `pn`, `am`, `cu=INR`, and `tn`.
+   - **Dynamic Vector QR Code:** High-contrast 29x29 vector QR rendered via Compose Canvas for desktop or companion-phone scanning.
+   - **12-Digit Bank UTR Verification:** Captures automatic return intent data (`Status=SUCCESS`, `txnId`, `responseCode`) or accepts manual 12-digit UTR bank reference number with validation and idempotent activation.
+   - **Privacy Isolation:** User's personal UPI ID, name, and phone number are stored strictly in gitignored `.env` and injected via `BuildConfig`, guaranteeing zero secret leaks when pushing to GitHub.
+2. **Server-Side Verified Payment Gateway (Razorpay):**
+   - **Zero Secrets in APK:** `RAZORPAY_KEY_ID`, `RAZORPAY_KEY_SECRET`, and `RAZORPAY_WEBHOOK_SECRET` reside exclusively on the Spring Boot backend (`application-prod.yml` / `.env`).
+   - **Cryptographic HMAC-SHA256 Verification:** `POST /api/v1/subscriptions/verify` computes constant-time HMAC-SHA256 over `orderId + "|" + paymentId`. Subscriptions are never activated on client state alone.
+   - **Signed Webhooks:** `POST /api/v1/webhooks/razorpay` verifies `X-Razorpay-Signature` and handles lifecycle events: `payment.captured`, `subscription.charged`, `payment.failed`, and `refund.processed` (which immediately revokes the clinic's entitlement).
+   - **Early Renewal Stacking:** When an active plan is renewed before expiration, the new duration is stacked onto the existing period (`currentExpiresAt + plan.durationDays`).
+   - **Zero PCI Card Storage:** Raw card numbers (PAN) and CVVs are strictly rejected; only masked instruments (`Card •••• 4242`, UPI VPA) are stored.
+
+### 8.2 PostgreSQL Flyway Schema Migrations
+- `V1__init_schema.sql`: Core clinic, staff, doctor chamber, queue session, token, and audit log tables.
+- `V2__subscriptions_and_app_updates.sql`: `clinic_subscriptions`, `payment_transactions`, `payment_webhook_events`, and `app_releases`.
+
+---
+
+## 9. Cryptographic In-App Update Engine (`AppUpdateManager`)
+
+For clinics and doctor tablets deployed outside the Google Play Store or receiving direct enterprise releases:
+1. **Trusted HTTPS Manifest:** Queries `GET /api/v1/releases/latest` (served by `SubscriptionAndUpdateController` backed by `release/version-manifest.json`).
+2. **Untrusted Domain Rejection:** Validates release URL against trusted domains; blocks cleartext HTTP.
+3. **Mandatory vs. Optional Logic:** Evaluates `installedVersionCode` against `latestVersionCode` and `minRequiredVersionCode`.
+4. **Pre-Install Cryptographic & Signature Verification:**
+   - Computes SHA-256 digest of the downloaded APK and verifies against `manifest.sha256Checksum` (deletes corrupt downloads on mismatch).
+   - Verifies APK signature scheme v2 certificate compatibility against `signingCertSha256 = e7a6c74f3503b88d43919eb8a763da4692e281c01f79b07da0a30939f4d5e5fd`.
+   - Preserves local Room databases, active sessions, and DPDP preferences across in-place upgrades.
+   - Launches Android Package Installer securely via `FileProvider` (`content://com.aistudio.clinicqueue.rwnq.fileprovider/`).
