@@ -77,7 +77,7 @@ secrets {
   propertiesFileName = ".env"
   defaultPropertiesFileName = ".env.example"
   ignoreList.add("FIREBASE_APPCHECK_DEBUG_TOKEN")
-  ignoreList.add("^(SPRING_|SERVER_|POSTGRES_|APP_).*")
+  ignoreList.add("^(SPRING_|SERVER_|POSTGRES_|APP_|RAZORPAY_).*")
 }
 
 googleServices { missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN }

@@ -735,7 +735,14 @@ object DemoDataProvider {
         return token
     }
 
-    fun createWalkIn(displayName: String, priority: Boolean, chamber: String = "Chamber A", doctorId: String = "doc_john"): QueueToken {
+    fun createWalkIn(
+        displayName: String,
+        priority: Boolean,
+        chamber: String = "Chamber A",
+        doctorId: String = "doc_john",
+        clinicId: String = "clinic_xyz"
+    ): QueueToken {
+        com.example.core.payment.SubscriptionPaymentEngine.enforceEntitlementOrThrow(clinicId)
         val tokens = _tokensState.value.toMutableList()
         val session = _sessionState.value
         val num = session.nextTokenNumber

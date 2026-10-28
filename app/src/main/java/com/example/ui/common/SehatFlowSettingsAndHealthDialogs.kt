@@ -12,16 +12,26 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.R
 import com.example.core.datastore.AppThemeMode
+import com.example.core.payment.*
+import com.example.core.update.AppUpdateManager
+import com.example.core.update.UpdateUiState
 import com.example.domain.model.DpdpPrivacyRegistry
 import com.example.domain.model.PatientHealthProfile
 import com.example.domain.model.PatientHealthProfileRegistry
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
+import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -31,20 +41,44 @@ fun SehatFlowSettingsDialog(
     currentThemeMode: AppThemeMode,
     isQueueSoundEnabled: Boolean,
     currentPatientId: String? = null,
+    currentClinicId: String = "clinic_1",
     onSelectThemeMode: (AppThemeMode) -> Unit,
     onToggleQueueSound: (Boolean) -> Unit,
     onSaveServerConfig: (String, Boolean) -> Unit,
     onOpenHealthProfile: (() -> Unit)? = null,
+    onOpenSubscriptionScreen: (() -> Unit)? = null,
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
     var urlInput by remember(currentServerUrl) { mutableStateOf(currentServerUrl) }
-    var demoToggle by remember(isDemoMode) { mutableStateOf(isDemoMode) }
     var selectedLanguage by remember { mutableStateOf("en") }
     var dpdpStatusMessage by remember { mutableStateOf<String?>(null) }
     val activePatientId = currentPatientId?.takeIf { it.isNotBlank() } ?: "pat_demo_patient"
     var consentRecord by remember(activePatientId) {
         mutableStateOf(DpdpPrivacyRegistry.getConsentRecord(activePatientId))
     }
+
+    // Subscription state in Settings
+    val allSubscriptions by SubscriptionPaymentEngine.subscriptionsFlow.collectAsStateWithLifecycle()
+    val allTransactions by SubscriptionPaymentEngine.transactionsFlow.collectAsStateWithLifecycle()
+    val currentSubscription = remember(currentClinicId, allSubscriptions) {
+        SubscriptionPaymentEngine.getOrCreateClinicSubscription(clinicId = currentClinicId)
+    }
+    val clinicTransactions = remember(currentClinicId, allTransactions) {
+        SubscriptionPaymentEngine.getTransactionsForClinic(currentClinicId)
+    }
+    var selectedSettingsPlan by remember { mutableStateOf(SubscriptionPaymentEngine.AVAILABLE_PLANS.first()) }
+    var settingsSubFeedback by remember { mutableStateOf<String?>(null) }
+    var upiVpaInput by remember { mutableStateOf(SubscriptionPaymentEngine.upiConfig.upiVpa) }
+    var payeeNameInput by remember { mutableStateOf(SubscriptionPaymentEngine.upiConfig.payeeName) }
+    var upiNumberInput by remember { mutableStateOf(SubscriptionPaymentEngine.upiConfig.upiNumber) }
+    var isEditingUpiConfig by remember { mutableStateOf(false) }
+    val dateFormatter = remember { SimpleDateFormat("dd MMM yyyy", Locale.US) }
+
+    // In-App Update state in Settings
+    val updateUiState by AppUpdateManager.updateState.collectAsStateWithLifecycle()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -130,7 +164,494 @@ fun SehatFlowSettingsDialog(
                     }
                 }
 
-                // 2. QUEUE NOTIFICATIONS & ALERTS (P1)
+                // 2. IN-APP SUBSCRIPTION MANAGEMENT SECTION
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_subscription_section")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.CardMembership,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Text(
+                                    text = "Subscription & Billing",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(6.dp),
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("settings_subscription_status_badge")
+                            ) {
+                                Text(
+                                    text = currentSubscription.status.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onPrimary,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "Current Plan: ${currentSubscription.currentPlanName}",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.testTag("settings_current_plan_text")
+                        )
+
+                        val expiryDateStr = dateFormatter.format(
+                            Date(
+                                if (currentSubscription.status == SubscriptionLifecycleStatus.TRIAL)
+                                    currentSubscription.trialEndsAtMillis
+                                else currentSubscription.expiresAtMillis
+                            )
+                        )
+                        Text(
+                            text = "Renewal / Expiry Date: $expiryDateStr • Auto-Renew: ${if (currentSubscription.autoRenew) "On" else "Off"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.testTag("settings_subscription_expiry_text")
+                        )
+
+                        // Configurable Payee UPI ID
+                        Surface(
+                            shape = RoundedCornerShape(8.dp),
+                            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f),
+                            border = BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "Receiving UPI ID (Direct Payments)",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    TextButton(
+                                        onClick = {
+                                            if (isEditingUpiConfig) {
+                                                SubscriptionPaymentEngine.updateUpiConfig(upiVpaInput, payeeNameInput, upiNumberInput)
+                                                settingsSubFeedback = "Receiving UPI updated to $upiVpaInput"
+                                            }
+                                            isEditingUpiConfig = !isEditingUpiConfig
+                                        }
+                                    ) {
+                                        Text(if (isEditingUpiConfig) "Save" else "Edit", style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
+                                if (isEditingUpiConfig) {
+                                    OutlinedTextField(
+                                        value = upiVpaInput,
+                                        onValueChange = { upiVpaInput = it },
+                                        label = { Text("UPI VPA") },
+                                        placeholder = { Text("doctor@okaxis / clinic@okhdfcbank") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = payeeNameInput,
+                                        onValueChange = { payeeNameInput = it },
+                                        label = { Text("Payee Name") },
+                                        placeholder = { Text("Clinic / Doctor Name") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    OutlinedTextField(
+                                        value = upiNumberInput,
+                                        onValueChange = { upiNumberInput = it },
+                                        label = { Text("UPI Phone Number") },
+                                        placeholder = { Text("9876543210 (Optional)") },
+                                        singleLine = true,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                } else {
+                                    Text(
+                                        text = "${SubscriptionPaymentEngine.upiConfig.upiVpa} (${SubscriptionPaymentEngine.upiConfig.payeeName}" +
+                                            if (SubscriptionPaymentEngine.upiConfig.upiNumber.isNotBlank()) " • ${SubscriptionPaymentEngine.upiConfig.upiNumber})" else ")",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                }
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            SubscriptionPaymentEngine.AVAILABLE_PLANS.forEach { plan ->
+                                val selected = selectedSettingsPlan.planId == plan.planId
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = { selectedSettingsPlan = plan },
+                                    label = {
+                                        Text(
+                                            text = "₹${plan.priceInr}",
+                                            style = MaterialTheme.typography.labelSmall
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("settings_plan_chip_${plan.planId}")
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Button(
+                                onClick = {
+                                    val order = SubscriptionPaymentEngine.createPaymentOrder(
+                                        clinicId = currentClinicId,
+                                        adminUid = activePatientId,
+                                        planId = selectedSettingsPlan.planId,
+                                        autoRenew = true
+                                    )
+                                    val payId = "pay_rzp_${UUID.randomUUID().toString().replace("-", "").take(10)}"
+                                    val sig = SubscriptionPaymentEngine.computeOrderPaymentSignature(order.orderId, payId)
+                                    val verified = SubscriptionPaymentEngine.verifyPaymentAndActivate(
+                                        orderId = order.orderId,
+                                        gatewayPaymentId = payId,
+                                        gatewaySignature = sig,
+                                        paymentMetadata = SafePaymentMetadata(
+                                            method = PaymentGatewayMethod.UPI,
+                                            maskedInstrument = "clinic@okhdfcbank"
+                                        )
+                                    )
+                                    if (verified is PaymentVerificationOutcome.Activated) {
+                                        settingsSubFeedback = "Activated ${verified.subscription.currentPlanName} (Ref: ${verified.transaction.transactionId})"
+                                    }
+                                },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("settings_purchase_plan_btn"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text(
+                                    text = "Upgrade (${selectedSettingsPlan.billingCycleLabel})",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+
+                            if (currentSubscription.status == SubscriptionLifecycleStatus.ACTIVE) {
+                                OutlinedButton(
+                                    onClick = {
+                                        val cancelled = SubscriptionPaymentEngine.cancelSubscription(
+                                            clinicId = currentClinicId,
+                                            reason = "Cancelled from Settings"
+                                        )
+                                        settingsSubFeedback = "Auto-renewal cancelled. Active until ${dateFormatter.format(Date(cancelled.expiresAtMillis))}."
+                                    },
+                                    modifier = Modifier.testTag("settings_cancel_subscription_btn"),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Cancel", style = MaterialTheme.typography.labelSmall)
+                                }
+                            }
+                        }
+
+                        if (clinicTransactions.isNotEmpty()) {
+                            val latestTxn = clinicTransactions.first()
+                            Text(
+                                text = "Latest Payment: ₹${latestTxn.amountInr} • ${latestTxn.status.name} (${latestTxn.transactionId})",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.testTag("settings_latest_payment_text")
+                            )
+                        }
+
+                        if (onOpenSubscriptionScreen != null) {
+                            OutlinedButton(
+                                onClick = {
+                                    onDismiss()
+                                    onOpenSubscriptionScreen()
+                                },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("open_full_subscription_screen_btn"),
+                                shape = RoundedCornerShape(10.dp)
+                            ) {
+                                Text("Open Full Subscription & Invoice Portal", style = MaterialTheme.typography.labelSmall)
+                            }
+                        }
+
+                        settingsSubFeedback?.let { msg ->
+                            Text(
+                                text = msg,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontWeight = FontWeight.SemiBold,
+                                modifier = Modifier.testTag("settings_subscription_feedback_text")
+                            )
+                        }
+                    }
+                }
+
+                // 3. IN-APP UPDATES SECTION (Settings -> Check for Updates)
+                Surface(
+                    shape = RoundedCornerShape(14.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("settings_check_updates_section")
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.SystemUpdate,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Text(
+                                text = "App Updates",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+
+                        Text(
+                            text = "Installed: Version ${com.example.BuildConfig.VERSION_NAME} (Build ${com.example.BuildConfig.VERSION_CODE})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+
+                        OutlinedButton(
+                            onClick = {
+                                coroutineScope.launch {
+                                    AppUpdateManager.checkForUpdates()
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("btn_check_for_updates"),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text("Check for Updates")
+                        }
+
+                        when (val state = updateUiState) {
+                            is UpdateUiState.Idle -> Unit
+                            is UpdateUiState.Checking -> {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
+                                    Text(
+                                        text = "Checking official SehatFlow HTTPS release manifest...",
+                                        style = MaterialTheme.typography.labelSmall
+                                    )
+                                }
+                            }
+                            is UpdateUiState.UpToDate -> {
+                                Surface(
+                                    shape = RoundedCornerShape(8.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.65f),
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("update_status_up_to_date_card")
+                                ) {
+                                    Text(
+                                        text = state.message,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        modifier = Modifier.padding(8.dp)
+                                    )
+                                }
+                            }
+                            is UpdateUiState.UpdateAvailable -> {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = if (state.isMandatory) MaterialTheme.colorScheme.errorContainer
+                                    else MaterialTheme.colorScheme.secondaryContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("update_available_card")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = if (state.isMandatory) {
+                                                "MANDATORY UPDATE: SehatFlow v${state.manifest.latestVersionName} (Build ${state.manifest.latestVersionCode})"
+                                            } else {
+                                                "Update Available: SehatFlow v${state.manifest.latestVersionName} (Build ${state.manifest.latestVersionCode})"
+                                            },
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        state.manifest.releaseNotes.forEach { note ->
+                                            Text(
+                                                text = "• $note",
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
+                                        Button(
+                                            onClick = {
+                                                coroutineScope.launch {
+                                                    AppUpdateManager.downloadAndVerifyUpdate(
+                                                        context = context,
+                                                        manifest = state.manifest
+                                                    )
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("btn_update_now")
+                                        ) {
+                                            Icon(Icons.Default.Download, contentDescription = null, modifier = Modifier.size(16.dp))
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("Update Now")
+                                        }
+                                    }
+                                }
+                            }
+                            is UpdateUiState.Downloading -> {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                                    modifier = Modifier.testTag("update_downloading_box")
+                                ) {
+                                    Text(
+                                        text = "Downloading v${state.manifest.latestVersionName}... ${state.progress.progressPercent}%",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    LinearProgressIndicator(
+                                        progress = { state.progress.progressPercent / 100f },
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                }
+                            }
+                            is UpdateUiState.ReadyToInstall -> {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("update_ready_to_install_card")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = "SHA-256 & Package Signature Verified (v${state.manifest.latestVersionName})",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Text(
+                                            text = "Checksum: ${state.computedSha256.take(16)}...",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                                        )
+                                        Button(
+                                            onClick = {
+                                                runCatching {
+                                                    val installIntent = AppUpdateManager.createInstallApkIntent(
+                                                        context = context,
+                                                        verifiedApkFile = state.verifiedApkFile
+                                                    )
+                                                    context.startActivity(installIntent)
+                                                }
+                                            },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("btn_install_verified_update")
+                                        ) {
+                                            Text("Install Verified Update")
+                                        }
+                                    }
+                                }
+                            }
+                            is UpdateUiState.Error -> {
+                                Surface(
+                                    shape = RoundedCornerShape(10.dp),
+                                    color = MaterialTheme.colorScheme.errorContainer,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .testTag("update_error_card")
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(10.dp),
+                                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                                    ) {
+                                        Text(
+                                            text = state.title,
+                                            style = MaterialTheme.typography.labelMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                        Text(
+                                            text = state.message,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = MaterialTheme.colorScheme.onErrorContainer
+                                        )
+                                        if (state.retryManifest != null) {
+                                            OutlinedButton(
+                                                onClick = {
+                                                    coroutineScope.launch {
+                                                        AppUpdateManager.downloadAndVerifyUpdate(
+                                                            context = context,
+                                                            manifest = state.retryManifest
+                                                        )
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .testTag("btn_retry_update")
+                                            ) {
+                                                Text("Retry Download")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. QUEUE NOTIFICATIONS & ALERTS (P1)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -163,7 +684,7 @@ fun SehatFlowSettingsDialog(
                     }
                 }
 
-                // 3. OPTIONAL HEALTH PROFILE & DPDP PRIVACY CONTROLS (P1)
+                // 5. OPTIONAL HEALTH PROFILE & DPDP PRIVACY CONTROLS (P1)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f),
@@ -290,7 +811,7 @@ fun SehatFlowSettingsDialog(
                     }
                 }
 
-                // 4. SERVER CONFIGURATION
+                // 6. SERVER CONFIGURATION
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
@@ -318,7 +839,7 @@ fun SehatFlowSettingsDialog(
                     }
                 }
 
-                // 5. ABOUT, HELP & LEGAL SUMMARY (P2)
+                // 7. ABOUT, HELP & LEGAL SUMMARY (P2)
                 Surface(
                     shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),

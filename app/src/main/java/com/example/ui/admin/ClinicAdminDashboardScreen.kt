@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.data.di.ServiceLocator
 import com.example.data.model.SubscriptionStatus
 import com.example.ui.onboarding.OnboardingRoadmapDialog
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,6 +48,14 @@ fun ClinicAdminDashboardScreen(
     val tokensState by repo.observeTokens(clinicId).collectAsStateWithLifecycle(initialValue = emptyList())
 
     var showRoadmap by remember { mutableStateOf(false) }
+    var showSettingsDialog by remember { mutableStateOf(false) }
+
+    val coroutineScope = rememberCoroutineScope()
+    val prefs = remember { com.example.data.di.ServiceLocator.sessionPreferences }
+    val currentServerUrl by prefs.serverUrl.collectAsStateWithLifecycle(initialValue = prefs.getServerUrlSync())
+    val isDemoModeActive by prefs.isDemoMode.collectAsStateWithLifecycle(initialValue = prefs.isDemoModeSync())
+    val currentThemeMode by prefs.themeMode.collectAsStateWithLifecycle(initialValue = prefs.getThemeModeSync())
+    val isQueueSoundEnabled by prefs.queueSoundVibrationEnabled.collectAsStateWithLifecycle(initialValue = prefs.isQueueSoundVibrationEnabledSync())
 
     val isProActive = clinicState?.subscriptionStatus == SubscriptionStatus.ACTIVE.name
 
@@ -56,6 +65,31 @@ fun ClinicAdminDashboardScreen(
     val waitingCount = if (tokensState.isNotEmpty()) tokensState.count { it.status == "WAITING" } else demoTokens.count { it.status == com.example.domain.model.TokenStatus.WAITING }
     val inConsultationCount = if (tokensState.isNotEmpty()) tokensState.count { it.status == "IN_CONSULTATION" } else demoTokens.count { it.status == com.example.domain.model.TokenStatus.IN_CONSULTATION || it.status == com.example.domain.model.TokenStatus.CALLED }
     val completedCount = if (tokensState.isNotEmpty()) tokensState.count { it.status == "COMPLETED" } else demoTokens.count { it.status == com.example.domain.model.TokenStatus.COMPLETED }
+
+    if (showSettingsDialog) {
+        com.example.ui.common.SehatFlowSettingsDialog(
+            currentServerUrl = currentServerUrl,
+            isDemoMode = isDemoModeActive,
+            currentThemeMode = currentThemeMode,
+            isQueueSoundEnabled = isQueueSoundEnabled,
+            currentClinicId = clinicId,
+            onSelectThemeMode = { mode ->
+                coroutineScope.launch { prefs.setThemeMode(mode) }
+            },
+            onToggleQueueSound = { enabled ->
+                coroutineScope.launch { prefs.setQueueSoundVibrationEnabled(enabled) }
+            },
+            onSaveServerConfig = { newUrl, newDemo ->
+                coroutineScope.launch {
+                    runCatching { prefs.setServerUrl(newUrl) }
+                    prefs.setDemoMode(newDemo)
+                }
+                showSettingsDialog = false
+            },
+            onOpenSubscriptionScreen = onOpenSubscription,
+            onDismiss = { showSettingsDialog = false }
+        )
+    }
 
     Scaffold(
         topBar = {
@@ -75,6 +109,12 @@ fun ClinicAdminDashboardScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showSettingsDialog = true },
+                        modifier = Modifier.testTag("btn_admin_settings")
+                    ) {
+                        Icon(Icons.Default.Settings, contentDescription = "Settings")
+                    }
                     IconButton(
                         onClick = onOpenOperationalHistory,
                         modifier = Modifier.testTag("btn_admin_top_history")
